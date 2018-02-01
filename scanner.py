@@ -404,56 +404,10 @@ class StateMachine(object):
 
 
 
-# class ParseMachine(object):
-    # def __init__(self, parent, name):
-        # self.patterns = {} # tuple to next state but UNINITIALIZED
-        # self.children = []
-        # self.parent = parent
-        # self.name = name
-    
-    # def match(self, pattern):
-        # return pattern in self.patterns
-        
-    # def create(self, pattern):
-        # newNode = self.patterns[pattern](self)
-        # self.children.append(newNode)
-        # return newNode
-        
-    # def printAll(self):
-        # for child in children:
-            # print(self.name, child.name)
-            # child.printAll()
-
-# class RootMachine(ParseMachine):
-    # def __init__(self):
-        # ParseMachine.__init__(self, None, None)
-        
-    # def create(self, pattern):
-        # return self.patterns[pattern](None)
         
 '''
-goal -> expr
 
-expr -> term expr'
-expr' -> + term expr'
-        | - term expr'
-        | null
-term -> factor term'
-term'-> | * factor term'
-        | / factor term'
-        | null
-
-factor -> number | id
-
-x + y - 2
-
-x -> factor -> factor term'-> term
-+ -> term +
-y => term + factor -> term + term -> term expr' -> expr
-- -> expr -
-2 -> expr - 2 -> expr - term -> expr expr'
-
-//////goal -> expr   fix me i guess
+//////goal -> expr   fix me i guess?
 expr -> expr + factor
      | expr - factor
      | factor
@@ -466,66 +420,123 @@ y -> expr + factor -> expr
 and so on
 '''
         
-# class Example(ParseMachine):
-    # def __init__(self, parent):
-        # ParseMachine.__init__(self, parent, "example")
-        
 class Node(object):
-    def __init__(self, name, parent, children, token=None):
+    def __init__(self, name, tokens):
         self.name = name
-        self.parent = parent
-        self.children = children
-        self.token = token
+        self.tokens = tokens
+        self.parent = None
+        self.children = []
+        
+    def printAll(self):
+        for child in self.children:
+            print(self.name, child.name)
+            child.printAll()
+        
         
 class Patterns(object):
     def __init__(self):
-        self.patterns = {}
+        self.patterns = {
+            # ("expr", "plus", "expr") : ("expr",),
+            # ("expr", "minus", "expr") : ("expr",),
+            # ("identifier",) : ("expr",),
+            
+            ("expression", "comma", "expression"): "argList",
+            ("argList", "comma", "expression"): "argList",
+            
+            ("identifier", "lbracket", "expression", "rbracket"): "name",
+            ("identifier",): "name",
+            
+            ("arglist", "expression"): "arglist",
+            ("expression"): "arglist",
+            
+            ("lparen", "expression", "rparen"): "factor",
+            ("minus", "name"): "factor",
+            ("name",): "factor",
+            ("minus", "number"): "factor",
+            ("number",): "factor",
+            ("string",): "factor",
+            ("char",): "factor",
+            ("true",): "factor",
+            ("false",): "factor",
+            
+            ("term", "multiply", "factor"): "term",
+            ("term", "divide", "factor"): "term",
+            # ("factor",): "term",
+            
+            ("relation", "less", "term"): "relation",
+            ("relation", "lessequal", "term"): "relation",
+            ("relation", "greater", "term"): "relation",
+            ("relation", "greaterequal", "term"): "relation",
+            ("relation", "equalequal", "term"): "relation",
+            ("relation", "notequal", "term"): "relation",
+            # ("term",): "relation",
+            
+            ("arithOp", "plus", "relation"): "arithOp",
+            ("arithOp", "minus", "relation"): "arithOp",
+            # ("relation",): "arithOp",
+            
+            ("expression", "and", "arithOp"): "expression",
+            ("expression", "or", "arithOp"): "expression",
+            ("not", "arithOp"): "expression",
+            # ("arithOp",): "expression",
+        }
         
     def match(self, pattern):
         return pattern in self.patterns
         
-    def create(self):
-        return self.patterns[pattern]()
+    def create(self, pattern):
+        # return Node(self.patterns[pattern])
+        # return Node(self.patterns[pattern], pattern)
+        return (self.patterns[pattern], pattern,)
         
 class Parser(object):
     def __init__(self):
         self.currTokens = []
-        self.treeNode = RootMachine() #root machine gets us going
+        # self.treeNode = Node("root", None) 
+        self.treeNode = None
+        self.patterns = Patterns()
+        self.currNodes = []
         
     def parse(self, tokens):
         for token in tokens:
             self.currTokens.append(token)
             self.reduce()
             
-        while(self.treeNode.parent):
-            self.treeNode = self.treeNode.parent
+        print(self.currTokens)
+        # while(self.treeNode.parent):
+            # self.treeNode = self.treeNode.parent
         
-        self.treeNode.printAll()
+        # self.treeNode.printAll()
             
     def reduce(self):
         reduceable = True
         reduced = False
         while(reduceable):
             if reduced: reduced = False
-            for n in range(len(self.currTokens)-1, 0):
-                pattern = tuple(self.currTokens[n:][0]) #idk if this works
-                # if self.treeNode.match(pattern):
-                    # self.treeNode = self.treeNode.create(pattern)
+            for n in range(len(self.currTokens), -1,-1):
+                # print("scanning", self.currTokens)
+                # pattern = tuple(self.currTokens[n:][0]) #idk if this works
+                pattern = tuple(tok[0] for tok in self.currTokens[n:]) #idk if this works
+                # print("pattern: ", pattern)
+                if self.patterns.match(pattern):
+                    newToken = self.patterns.create(pattern)
+                    print("reducing", pattern, "to", newToken[0])
+                    # newNode = self.patterns.create(pattern)
+                    # if (n==0):
+                        # for node in self.currNodes:
+                            # newNode.children.append(node)
+                        # if self.treeNode: newNode.children.append(self.treeNode)
+                        # self.currNodes = []
+                        # self.treeNode = newNode
+                    # else:
+                        # self.currNodes.append(newNode)
                     
-                    # self.currTokens = self.currTokens[:n]
-                    # self.currTokens.append(self.treeNode.name)
-                    # recuded = True
-                    # break
-                if self.treeNode.match(pattern):
-                    self.treeNode = self.treeNode.create(pattern)
                     
                     self.currTokens = self.currTokens[:n]
-                    self.currTokens.append(self.treeNode.name)
-                    recuded = True
+                    # self.currTokens.append(newNode.name)
+                    self.currTokens.append(newToken)
+                    reduced = True
                     break
-                # was going to make a list of all possible patterns at a given moment and match
-                # that is more ugly than I want
-                # I know there's a solution... not sure what it is
                     
             if not reduced: reduceable = False
                 
@@ -533,7 +544,7 @@ class Parser(object):
     
 
 
-
+tree = Parser().parse(tokens)
 
 
 
