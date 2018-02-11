@@ -83,7 +83,8 @@ class Identifier(StateMachine):
         
         self.keywords = ("if", "then", "else", "end", "for", "not", "true", "false", 
                          "integer", "float", "bool", "char", "procedure", "in", "out", "inout", 
-                         "begin", "program", "is", "global")
+                         "begin", "program", "is", "global",
+                         "return")
         
     def terminate(self):
         retVal = None
@@ -494,7 +495,108 @@ class Node(object):
             print(self.name, child.name)
             child.printAll()
         
+
 '''
+                ("name", "lbracket", "expression", "rbracket"): "name",
+                ("identifier",): "name",
+                
+                ("lparen", "expression", "rparen"): "term",
+                ("minus", "name"): "term",
+                ("name",): "term",
+                ("minus", "number"): "term",
+                ("number",): "term",
+                ("string",): "term",
+                ("char",): "term",
+                ("true",): "term",
+                ("false",): "term",
+                
+                ("binOp", "and", "binOp"): "binOp",
+                ("binOp", "or", "binOp"): "binOp",
+                ("not", "binOp"): "binOp",
+                ("term",): "binOp",
+                ("binOp", "and", ): "__shift__",
+                ("binOp", "or", ): "__shift__",
+                
+                ("arithOp", "plus", "arithOp"): "arithOp",
+                ("arithOp", "minus", "arithOp"): "arithOp",
+                ("binOp",): "arithOp",
+    expression kind of takes the place of factor? I suppose...?
+    instead of factor we have binOp
+    expression:  
+        expression * relation
+        expression / relation
+        relation
+        
+        
+        
+    relation:
+        relation < arithOp
+        ...
+        arithOp
+        
+    arithOp:
+        arithOp + binOp
+        -
+        binOp
+        
+    binOp:
+        binOp & term
+        binOp | term
+        not term
+        
+    term:
+        (expression)
+        - name
+        - number
+        string
+        char
+        
+        
+        self.asdfpatterns = {
+            ("name", "lbracket", "expression", "rbracket"): "name",
+            ("identifier",): "name",
+            
+            ("lparen", "expression", "rparen"): "term",
+            ("minus", "name"): "term",
+            ("name",): "term",
+            ("minus", "number"): "term",
+            ("number",): "term",
+            ("string",): "term",
+            ("char",): "term",
+            ("true",): "term",
+            ("false",): "term",
+            
+            ("binOp", "and", "term"): "binOp",
+            ("binOp", "or", "term"): "binOp",
+            ("not", "term"): "binOp",
+            ("term",): "binOp",
+            ("binOp", "and", ): "__shift__",
+            ("binOp", "or", ): "__shift__",
+            
+            ("arithOp", "plus", "binOp"): "arithOp",
+            ("arithOp", "minus", "binOp"): "arithOp",
+            ("binOp",): "arithOp",
+            ("arithOp", "plus", ): "__shift__",
+            ("arithOp", "minus", ): "__shift__",
+            
+            ("arithOp",): "relation",
+            
+            ("factor", "multiply", "relation"): "factor",
+            ("factor", "divide", "relation"): "factor",
+            ("relation",): "factor",
+        }
+'''
+
+
+
+class Patterns(object):
+    def __init__(self):
+        
+        self.patterns = {
+            ("identifier", "lbracket", "expression", "rbracket"): "name",
+            ("identifier",): "name",
+            # ("name", "assignment",): "__shift__", # for destination/assignment
+            
             ("lparen", "expression", "rparen"): "factor",
             ("minus", "name"): "factor",
             ("name",): "factor",
@@ -508,6 +610,8 @@ class Node(object):
             ("term", "multiply", "factor"): "term",
             ("term", "divide", "factor"): "term",
             ("factor",): "term",
+            # ("term", "multiply",): "__shift__", 
+            # ("term", "divide", ): "__shift__", 
             
             ("relation", "less", "term"): "relation",
             ("relation", "lessequal", "term"): "relation",
@@ -516,98 +620,153 @@ class Node(object):
             ("relation", "equalequal", "term"): "relation",
             ("relation", "notequal", "term"): "relation",
             ("term",): "relation",
+            # ("relation", "less",  ): "__shift__",
+            # ("relation", "lessequal", ): "__shift__",
+            # ("relation", "greater", ): "__shift__",
+            # ("relation", "greaterequal", ): "__shift__",
+            # ("relation", "equalequal", ): "__shift__",
+            # ("relation", "notequal", ): "__shift__",
             
             ("arithOp", "plus", "relation"): "arithOp",
             ("arithOp", "minus", "relation"): "arithOp",
             ("relation",): "arithOp",
+            # ("arithOp", "plus", ): "__shift__",
+            # ("arithOp", "minus", ): "__shift__",
             
             ("expression", "and", "arithOp"): "expression",
             ("expression", "or", "arithOp"): "expression",
             ("not", "arithOp"): "expression",
             ("arithOp",): "expression",
-            '''
-class Patterns(object):
-    def __init__(self):
-        self.patterns = {
-            # ("expr", "plus", "expr") : ("expr",),
-            # ("expr", "minus", "expr") : ("expr",),
-            # ("identifier",) : ("expr",),
             
-            ("expression", "comma", "expression"): "argList",
-            ("argList", "comma", "expression"): "argList",
+            ("expression", "comma", "argument_list"): "argument_list",    # need to shift something
+            # ("expression", ): "argument_list",    #would result in errors. instead, try shifting
+            # ("expression", "comma",): "__shift__",
             
-            # ("identifier", "lbracket", "expression", "rbracket"): "name",
-            ("name", "lbracket", "expression", "rbracket"): "name",
-            ("identifier",): "name",
-            
-            ("arglist", "expression"): "arglist",
-            ("expression"): "arglist",
-            
-            ("lparen", "expression", "rparen"): "arithOp",
-            # ("minus", "name"): "arithOp",
-            ("name",): "arithOp",
-            # ("minus", "number"): "arithOp",
-            ("number",): "arithOp",
-            ("string",): "arithOp",
-            ("char",): "arithOp",
-            ("true",): "arithOp",
-            ("false",): "arithOp",
-            
-            ("arithOp", "plus", "arithOp"): "arithOp",
-            ("arithOp", "minus", "arithOp"): "arithOp",
-            ("arithOp",): "relation",
-            
-            ("relation", "less", "relation"): "relation",
-            ("relation", "lessequal", "relation"): "relation",
-            ("relation", "greater", "relation"): "relation",
-            ("relation", "greaterequal", "relation"): "relation",
-            ("relation", "equalequal", "relation"): "relation",
-            ("relation", "notequal", "relation"): "relation",
-            ("relation",): "factor",
-            
-            ("factor", "multiply", "factor"): "factor",
-            ("factor", "divide", "factor"): "factor",
-            ("factor",): "expression",
-            
-            ("minus", "expression"): "expression",
-            ("expression", "and", "expression"): "expression",
-            ("expression", "or", "expression"): "expression",
-            ("not", "expression"): "expression",
-            # ("factor",): "expression",
-            
-            # ("expression", "expression"): "expression",
-            
-            # destination is redundant with name...
             ("name", "assignment", "expression"): "assignment_stmt",
             
-            ("for", "lparen", "assignment_stmt", "semic", "statement", "rparen", "end", "for",): "loop_statement",
+            ("for", "lparen", "assignment_stmt", "semic", "statement", "rparen"): "loop_start",
+            ("loop_start", "statement", "semic",): "loop_start",
+            ("loop_start", "end", "for",): "loop_stmt",
             
-            # ("if", "lparen", "expression", "rparen", "then"
+            ("return",): "return_stmt",
+            
+            # destination is redundant with name???
+            # ("identifier","lbracket","expression","rbracket"): "destination",
+            # ("identifier",): "destination",
+            
+            ("if", "lparen", "expression", "rparen", "then", "statement", "semic",): "if_start",
+            ("if_start", "statement","semic",): "if_start",
+            ("if_start", "else", "statement", "semic",): "else_start",
+            ("else_start", "statement", "semic",): "else_start",
+            ("if_start", "end", "if",): "if_stmt",
+            ("else_start", "end", "if"): "if_stmt",
+            # ("if", "lparen", "expression", "rparen",): "__shift__",
+            
+            ("assignment_stmt",): "statement",
+            ("if_stmt",): "statement",
+            ("loop_stmt",): "statement",
+            ("return_stmt",): "statement",
+            ("procedure_call",): "statement",
+            
+            ("integer",): "type_mark",
+            ("float",): "type_mark",
+            ("string",): "type_mark",
+            ("bool",): "type_mark",
+            ("char",): "type_mark",
+            
+            # could mess around with lower/upper bound, no real point
+            ("type_mark", "identifier"): "variable_declaration",
+            ("type_mark", "identifier","lbracket", "number", "colon", "number", "rbracket"): "variable_declaration",
+            # ("type_mark", "identifier","lbracket", "number",): "__shift__", # need to shift so number isn't sucked up
+            # do bounds always have to be numbers...?
+            
+            ("begin",): "procedure_body_start",
+            ("procedure_body_start", "statement", "semic",): "procedure_body_start",
+            ("procedure_body_start", "end", "procedure",): "procedure_body",
+            
+            ("variable_declaration", "in",): "parameter",
+            ("variable_declaration", "out",): "parameter",
+            ("variable_declaration", "inout",): "parameter",
+            
+            ("parameter",): "parameter_list",
+            ("parameter_list", "comma", "parameter"): "parameter_list",
+            
+            ("procedure", "identifier", "lparen", "rparen",): "procedure_header",
+            # ("procedure", "identifier", "lparen",): "__shift__", # stop identifiers from becoming names
+            ("procedure", "identifier", "lparen", "parameter_list","rparen"): "procedure_header",
+            # takes care of  declarations before procedure
+            ("procedure_header", "declaration", "semic",): "procedure_header", 
+            
+            ("procedure_header", "procedure_body",): "procedure_declaration",
+            
+            ("global", "procedure_declaration",): "declaration",
+            ("global", "variable_declaration",): "declaration",
+            ("procedure_declaration",): "declaration",
+            ("variable_declaration",): "declaration",
+            
+            # all programs are procedures until the end?
+            ("procedure_body_start", "end", "program",): "program_body", 
+            
+            # this doesn't work - when do we shift vs. reduce?
+            # ("program", "identifier", "is",): "program_header",
+            
+            # this way, identifier isn't caught between shift and reduce
+            ("program", "identifier",): "program_header_start",
+            ("program_header_start", "is"): "program_header",
+            
+            ("program_header", "program_body", "period"): "program",
         }
         
-        self.lookAheadTable = {
-            "plus": ("arithOp",),
-            "minus": ("arithOp",),
-            "less": ("term",),
-            "lessequal": ("term",),
-            "greater": ("term",),
-            "greaterequal": ("term",),
-            "equalequal": ("term",),
-            "notequal": ("term",),
-            "notequal": ("term",),
+        self.shiftTable = {
+            ("name", "assignment",): "__shift__", # for destination/assignment
+            
+            ("term", "multiply",): "__shift__", 
+            ("term", "divide", ): "__shift__", 
+            
+            ("relation", "less",  ): "__shift__",
+            ("relation", "lessequal", ): "__shift__",
+            ("relation", "greater", ): "__shift__",
+            ("relation", "greaterequal", ): "__shift__",
+            ("relation", "equalequal", ): "__shift__",
+            ("relation", "notequal", ): "__shift__",
+            
+            ("arithOp", "plus", ): "__shift__",
+            ("arithOp", "minus", ): "__shift__",
+            
+            ("expression", "comma",): "__shift__",
+            
+            ("if", "lparen", "expression", "rparen","then",): "__shift__",
+            
+            ("type_mark", "identifier","lbracket", "number",): "__shift__", # need to shift so number isn't sucked up
+            
+            ("procedure", "identifier", "lparen",): "__shift__", # stop identifiers from becoming names
+            
+            ("variable_declaration", "in",): "__shift__",
+            ("variable_declaration", "out",): "__shift__",
+            ("variable_declaration", "inout",): "__shift__",
         }
+        
         
     def match(self, pattern, lookAheadTok):
-        matches = pattern in self.patterns
-        if lookAheadTok and lookAheadTok[0] in self.lookAheadTable and self.lookAheadTable[lookAheadTok[0]] == pattern:
-            matches = False
-            print("performed lookahead", pattern, lookAheadTok)
-        return matches
+        matched = self.patterns.get(pattern, False) 
+        # if lookAheadTok and lookAheadTok[0] in self.lookAheadTable and self.lookAheadTable[lookAheadTok[0]] == pattern:
+            # matched = False
+            # print("performed lookahead", pattern, lookAheadTok)
+        if lookAheadTok:
+            lookAheadPattern = pattern + (lookAheadTok[0],)
+            # print("looking ahead for", lookAheadPattern)
+            
+            lookAhead = self.shiftTable.get(lookAheadPattern, False) 
+            if lookAhead == "__shift__":
+                matched = "__shift__"
+                print("FOUND LOOKAHEAD, USING SHIFT", lookAheadPattern)
         
-    def create(self, pattern, tokens):
+        return matched
+        
+    # def create(self, pattern, tokens):
         # return Node(self.patterns[pattern])
         # return Node(self.patterns[pattern], pattern)
-        return (self.patterns[pattern], tokens,)
+        # return (self.patterns[pattern], tokens,)
         
 class Parser(object):
     def __init__(self):
@@ -631,49 +790,43 @@ class Parser(object):
         
             
         print(self.currTokens)
-        # while(self.treeNode.parent):
-            # self.treeNode = self.treeNode.parent
+        # self.printAll(self.currTokens)
+        print(tuple(tok[0] for tok in self.currTokens))
         
-        # self.treeNode.printAll()
+        
             
     def reduce(self, lookAheadTok):
         reduceable = True
         reduced = False
+        err = False  # do this later... for now, blindly accept everything is A-OK
+        
+        # needs to be here, multiple reduces in one reduce call IS possible
         while(reduceable):
             if reduced: reduced = False
-            # for n in range(len(self.currTokens), -1,-1):
-            for n in range(0,len(self.currTokens)):
-                # print("scanning", self.currTokens)
-                # pattern = tuple(self.currTokens[n:][0]) #idk if this works
+            # for n in range(len(self.currTokens)-1, -1,-1):
+            for n in range(0,len(self.currTokens)):   # why did I ever do this
                 pattern = tuple(tok[0] for tok in self.currTokens[n:]) #idk if this works
                 print("pattern: ", pattern)
-                if self.patterns.match(pattern, lookAheadTok):
-                    # if lookaheadTok and self.patterns.match(pattern + (lookaheadTok[0],)):
-                        # print("did lookahead:", pattern + (lookaheadTok[0],))
-                        # return
-                        
-                    newToken = self.patterns.create(pattern, self.currTokens[n:])
+                
+                matched = self.patterns.match(pattern, lookAheadTok)
+                if matched:
+                    if matched == "__shift__":
+                        reduceable = False
+                        break
+                    
+                    newToken = (matched, self.currTokens[n:],)
+                    # newToken = self.patterns.create(pattern, self.currTokens[n:])
                     print("reducing", pattern, "to", newToken[0])
-                    # newNode = self.patterns.create(pattern)
-                    # if (n==0):
-                        # for node in self.currNodes:
-                            # newNode.children.append(node)
-                        # if self.treeNode: newNode.children.append(self.treeNode)
-                        # self.currNodes = []
-                        # self.treeNode = newNode
-                    # else:
-                        # self.currNodes.append(newNode)
                     
                     
                     self.currTokens = self.currTokens[:n]
-                    # self.currTokens.append(newNode.name)
                     self.currTokens.append(newToken)
                     reduced = True
                     break
                     
             if not reduced: reduceable = False
-                
-                
+        
+        
     
 
 
