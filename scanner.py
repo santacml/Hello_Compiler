@@ -303,6 +303,64 @@ class Scanner(object):
         self.file = file
         
     def scan(self):
+        with open(self.file, 'rb') as f:
+            currLine = 0
+            masterMachine = MasterMachine()
+            machine = masterMachine.clear()
+            for line in f:
+                currCol = 0
+                try:
+                    if not (machine.name == "block_comment"):
+                        # if we are in a block comment, persist, otherwise reset
+                        machine = masterMachine.clear()
+                    
+                    currLine += 1
+                    line = line.lower()
+                    # print(repr(line))
+                    
+                    for char in line.decode('ascii'):
+                        currCol += 1
+                        if char in ("\r\n", "\r", "\n"): continue #gets rid of newlines!
+                        
+                        # print("now accepting", char)
+                        machine = machine.accept(char)
+                        
+                        if machine.ended: 
+                            # print(machine.ended, machine.currStr, char)
+                            if machine.currStr:
+                                # tokens.append(machine.terminate())
+                                yield machine.terminate()
+                            
+                            
+                            machine = masterMachine.clear().accept(char)
+                            if not machine.currStr and char is not " " :  
+                                # token not found, also discard whitespace
+                                raise ScanError("Unexpected Token", char)
+                                
+                            # print("made new machine with: " + char)
+                    
+                    
+                    # at end of line, terminate machine
+                    if not (machine.name == "block_comment") and machine.currStr:
+                        # tokens.append(machine.terminate())
+                        yield machine.terminate()
+                        
+                except ScanError as e:
+                    print("Encountered error while scanning line: " + str(currLine )+ ".")
+                    print(e)
+                    print(line.decode('ascii'), " " * (currCol-2) + "^")
+                    print()
+                    return
+                    
+            # this is specifically for files that end in a block comment... 
+            # I guess I don't really need this...
+            if (machine.name == "block_comment") and machine.currStr:
+                yield machine.terminate()
+            
+        yield
+        yield
+        
+    def oldScan(self):
         tokens = []
         with open(self.file, 'rb') as f:
             currLine = 0
@@ -358,10 +416,14 @@ class Scanner(object):
             
         return tokens
 
-tokens = Scanner("test.src").scan()
+tokenGen = Scanner("test.src").scan()
+# tokenGen = next(scan)
+# while (tokenGen is not None):
+    # print(tokenGen)
+    # tokenGen = next(scan)
+
+tokens = Scanner("test.src").oldScan()
 for token in tokens: print(token)
-# tokens = Scanner("test2.src").scan()
-# for token in tokens: print(token)
 
 '''
 class StateMachine(object):
@@ -432,23 +494,7 @@ class Node(object):
             print(self.name, child.name)
             child.printAll()
         
-        
-class Patterns(object):
-    def __init__(self):
-        self.patterns = {
-            # ("expr", "plus", "expr") : ("expr",),
-            # ("expr", "minus", "expr") : ("expr",),
-            # ("identifier",) : ("expr",),
-            
-            ("expression", "comma", "expression"): "argList",
-            ("argList", "comma", "expression"): "argList",
-            
-            ("identifier", "lbracket", "expression", "rbracket"): "name",
-            ("identifier",): "name",
-            
-            ("arglist", "expression"): "arglist",
-            ("expression"): "arglist",
-            
+'''
             ("lparen", "expression", "rparen"): "factor",
             ("minus", "name"): "factor",
             ("name",): "factor",
@@ -461,7 +507,7 @@ class Patterns(object):
             
             ("term", "multiply", "factor"): "term",
             ("term", "divide", "factor"): "term",
-            # ("factor",): "term",
+            ("factor",): "term",
             
             ("relation", "less", "term"): "relation",
             ("relation", "lessequal", "term"): "relation",
@@ -469,25 +515,99 @@ class Patterns(object):
             ("relation", "greaterequal", "term"): "relation",
             ("relation", "equalequal", "term"): "relation",
             ("relation", "notequal", "term"): "relation",
-            # ("term",): "relation",
+            ("term",): "relation",
             
             ("arithOp", "plus", "relation"): "arithOp",
             ("arithOp", "minus", "relation"): "arithOp",
-            # ("relation",): "arithOp",
+            ("relation",): "arithOp",
             
             ("expression", "and", "arithOp"): "expression",
             ("expression", "or", "arithOp"): "expression",
             ("not", "arithOp"): "expression",
-            # ("arithOp",): "expression",
+            ("arithOp",): "expression",
+            '''
+class Patterns(object):
+    def __init__(self):
+        self.patterns = {
+            # ("expr", "plus", "expr") : ("expr",),
+            # ("expr", "minus", "expr") : ("expr",),
+            # ("identifier",) : ("expr",),
+            
+            ("expression", "comma", "expression"): "argList",
+            ("argList", "comma", "expression"): "argList",
+            
+            # ("identifier", "lbracket", "expression", "rbracket"): "name",
+            ("name", "lbracket", "expression", "rbracket"): "name",
+            ("identifier",): "name",
+            
+            ("arglist", "expression"): "arglist",
+            ("expression"): "arglist",
+            
+            ("lparen", "expression", "rparen"): "arithOp",
+            # ("minus", "name"): "arithOp",
+            ("name",): "arithOp",
+            # ("minus", "number"): "arithOp",
+            ("number",): "arithOp",
+            ("string",): "arithOp",
+            ("char",): "arithOp",
+            ("true",): "arithOp",
+            ("false",): "arithOp",
+            
+            ("arithOp", "plus", "arithOp"): "arithOp",
+            ("arithOp", "minus", "arithOp"): "arithOp",
+            ("arithOp",): "relation",
+            
+            ("relation", "less", "relation"): "relation",
+            ("relation", "lessequal", "relation"): "relation",
+            ("relation", "greater", "relation"): "relation",
+            ("relation", "greaterequal", "relation"): "relation",
+            ("relation", "equalequal", "relation"): "relation",
+            ("relation", "notequal", "relation"): "relation",
+            ("relation",): "factor",
+            
+            ("factor", "multiply", "factor"): "factor",
+            ("factor", "divide", "factor"): "factor",
+            ("factor",): "expression",
+            
+            ("minus", "expression"): "expression",
+            ("expression", "and", "expression"): "expression",
+            ("expression", "or", "expression"): "expression",
+            ("not", "expression"): "expression",
+            # ("factor",): "expression",
+            
+            # ("expression", "expression"): "expression",
+            
+            # destination is redundant with name...
+            ("name", "assignment", "expression"): "assignment_stmt",
+            
+            ("for", "lparen", "assignment_stmt", "semic", "statement", "rparen", "end", "for",): "loop_statement",
+            
+            # ("if", "lparen", "expression", "rparen", "then"
         }
         
-    def match(self, pattern):
-        return pattern in self.patterns
+        self.lookAheadTable = {
+            "plus": ("arithOp",),
+            "minus": ("arithOp",),
+            "less": ("term",),
+            "lessequal": ("term",),
+            "greater": ("term",),
+            "greaterequal": ("term",),
+            "equalequal": ("term",),
+            "notequal": ("term",),
+            "notequal": ("term",),
+        }
         
-    def create(self, pattern):
+    def match(self, pattern, lookAheadTok):
+        matches = pattern in self.patterns
+        if lookAheadTok and lookAheadTok[0] in self.lookAheadTable and self.lookAheadTable[lookAheadTok[0]] == pattern:
+            matches = False
+            print("performed lookahead", pattern, lookAheadTok)
+        return matches
+        
+    def create(self, pattern, tokens):
         # return Node(self.patterns[pattern])
         # return Node(self.patterns[pattern], pattern)
-        return (self.patterns[pattern], pattern,)
+        return (self.patterns[pattern], tokens,)
         
 class Parser(object):
     def __init__(self):
@@ -497,10 +617,18 @@ class Parser(object):
         self.patterns = Patterns()
         self.currNodes = []
         
-    def parse(self, tokens):
-        for token in tokens:
-            self.currTokens.append(token)
-            self.reduce()
+    def parse(self, tokenGen):
+        currTok = next(tokenGen)
+        lookAhead = next(tokenGen)
+        
+        while(currTok is not None):
+            self.currTokens.append(currTok)
+            self.reduce(lookAhead)
+            # print(self.currTokens)
+            
+            currTok = lookAhead
+            lookAhead = next(tokenGen) if lookAhead is not None else None # now THAT's python
+        
             
         print(self.currTokens)
         # while(self.treeNode.parent):
@@ -508,18 +636,23 @@ class Parser(object):
         
         # self.treeNode.printAll()
             
-    def reduce(self):
+    def reduce(self, lookAheadTok):
         reduceable = True
         reduced = False
         while(reduceable):
             if reduced: reduced = False
-            for n in range(len(self.currTokens), -1,-1):
+            # for n in range(len(self.currTokens), -1,-1):
+            for n in range(0,len(self.currTokens)):
                 # print("scanning", self.currTokens)
                 # pattern = tuple(self.currTokens[n:][0]) #idk if this works
                 pattern = tuple(tok[0] for tok in self.currTokens[n:]) #idk if this works
-                # print("pattern: ", pattern)
-                if self.patterns.match(pattern):
-                    newToken = self.patterns.create(pattern)
+                print("pattern: ", pattern)
+                if self.patterns.match(pattern, lookAheadTok):
+                    # if lookaheadTok and self.patterns.match(pattern + (lookaheadTok[0],)):
+                        # print("did lookahead:", pattern + (lookaheadTok[0],))
+                        # return
+                        
+                    newToken = self.patterns.create(pattern, self.currTokens[n:])
                     print("reducing", pattern, "to", newToken[0])
                     # newNode = self.patterns.create(pattern)
                     # if (n==0):
@@ -544,7 +677,7 @@ class Parser(object):
     
 
 
-tree = Parser().parse(tokens)
+tree = Parser().parse(tokenGen)
 
 
 
