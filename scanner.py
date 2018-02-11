@@ -629,6 +629,8 @@ class Patterns(object):
             
             ("arithOp", "plus", "relation"): "arithOp",
             ("arithOp", "minus", "relation"): "arithOp",
+            ("arithOp", "minus", "number"): "arithOp", # gross
+            ("arithOp", "minus", "name"): "arithOp",   # but this fixes it? I guess?
             ("relation",): "arithOp",
             # ("arithOp", "plus", ): "__shift__",
             # ("arithOp", "minus", ): "__shift__",
@@ -638,9 +640,13 @@ class Patterns(object):
             ("not", "arithOp"): "expression",
             ("arithOp",): "expression",
             
-            ("expression", "comma", "argument_list"): "argument_list",    # need to shift something
-            # ("expression", ): "argument_list",    #would result in errors. instead, try shifting
+            ("expression", "comma", "expression"): "argument_list",    # need to shift something
+            ("argument_list", "comma", "expression"): "argument_list",    #would result in errors. instead, try shifting
             # ("expression", "comma",): "__shift__",
+            
+            ("identifier", "lparen", "argument_list", "rparen",): "procedure_call",
+            # this way, not all expressions are arglists. makes life easier
+            ("identifier", "lparen", "expression", "rparen",): "procedure_call", 
             
             ("name", "assignment", "expression"): "assignment_stmt",
             
@@ -680,6 +686,8 @@ class Patterns(object):
             # ("type_mark", "identifier","lbracket", "number",): "__shift__", # need to shift so number isn't sucked up
             # do bounds always have to be numbers...?
             
+            
+            
             ("begin",): "procedure_body_start",
             ("procedure_body_start", "statement", "semic",): "procedure_body_start",
             ("procedure_body_start", "end", "procedure",): "procedure_body",
@@ -714,6 +722,8 @@ class Patterns(object):
             ("program", "identifier",): "program_header_start",
             ("program_header_start", "is"): "program_header",
             
+            ("program_header", "declaration", "semic",): "program_header",
+            
             ("program_header", "program_body", "period"): "program",
         }
         
@@ -744,6 +754,8 @@ class Patterns(object):
             ("variable_declaration", "in",): "__shift__",
             ("variable_declaration", "out",): "__shift__",
             ("variable_declaration", "inout",): "__shift__",
+            
+            ("identifier", "lparen",): "__shift__", # for procedure calls
         }
         
         
