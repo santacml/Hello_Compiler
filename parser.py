@@ -1,21 +1,58 @@
 from scanner import Scanner
         
-'''
+        
+# this makes it so that multiple things can have reference to same value?
+class SymTableItem(object):
+    def __init__(self, value):
+        self.value = value
+        
+        
 
-//////goal -> expr   fix me i guess?
-expr -> expr + factor
-     | expr - factor
-     | factor
-
-factor -> num | id
-
-x -> factor -> expr
-+ -> expr +
-y -> expr + factor -> expr
-and so on
-'''
-
-
+class SymTable(object):
+    def __init__(self):
+        self.core = {}
+        self.currScope = None
+        
+    def exit(self):
+        # i can delete scopes and it's fine
+        # anything that has references to the items will still have them
+        del self.scopes[-1]
+        
+        if len(self.scopes) > 0:
+            self.currScope = self.scopes[-1]
+        else:
+            self.currScope = None
+        
+    def enter(self):
+        self.scopes.append({})
+        self.currScope = self.scopes[-1]
+        
+    def __getitem__(self, key):
+        item = None
+        if not (self.currScope == None):
+            item = self.currScope.get(key, None)
+        if not item:
+            item = self.core.get(key, None)
+        if not item:
+            print("Could not find symbol.")
+            print("Could not find symbol.")
+            
+        return item
+    
+    def __setitem__(self, key, value):
+        if not (self.currScope == None):
+            self.currScope[key] = SymTableItem(value)
+        else:
+            self.core[key] = SymTableItem(value)
+        
+    def __contains__(self, key):  
+        contained = False
+        if not (self.currScope == None):
+            if key in self.currScope: contained = True
+        
+        if ket in self.core: contained = True
+        
+        return contained
 
 class Patterns(object):
     def __init__(self):
@@ -63,6 +100,8 @@ class Patterns(object):
             ("identifier", "lparen", "argument_list", "rparen",): "procedure_call",
             # this way, not all expressions are arglists. makes life easier
             ("identifier", "lparen", "expression", "rparen",): "procedure_call", 
+            # can call procedure without args dummy
+            ("identifier", "lparen", "rparen",): "procedure_call", 
             
             ("name", "assignment", "expression"): "assignment_stmt",
             
@@ -98,6 +137,7 @@ class Patterns(object):
             # could mess around with lower/upper bound, no real point
             ("type_mark", "identifier"): "variable_declaration",
             ("type_mark", "identifier","lbracket", "number", "colon", "number", "rbracket"): "variable_declaration",
+            ("type_mark", "identifier","lbracket", "expression", "rbracket"): "variable_declaration",
             # do bounds always have to be numbers...?
             
             
@@ -162,6 +202,7 @@ class Patterns(object):
             ("if", "lparen", "expression", "rparen","then",): "__shift__",
             
             ("type_mark", "identifier","lbracket", "number",): "__shift__", # need to shift so number isn't sucked up
+            ("type_mark", "identifier","lbracket",): "__shift__", # need to shift so identifier isn't sucked up
             
             ("procedure", "identifier", "lparen",): "__shift__", # stop identifiers from becoming names
             
@@ -189,7 +230,6 @@ class Patterns(object):
         
         return matched
         
-        
 class Parser(object):
     def __init__(self):
         self.currTokens = []
@@ -197,13 +237,17 @@ class Parser(object):
         self.treeNode = None
         self.patterns = Patterns()
         self.currNodes = []
+        self.symTable = SymTable()
         
     def parse(self, tokenGen):
         currTok = next(tokenGen)
         lookAhead = next(tokenGen)
         
         while(currTok is not None):
+            # shift
             self.currTokens.append(currTok)
+            
+            # reduce 
             self.reduce(lookAhead)
             # print(self.currTokens)
             
@@ -211,8 +255,7 @@ class Parser(object):
             lookAhead = next(tokenGen) if lookAhead is not None else None # now THAT's python
         
             
-        print(self.currTokens)
-        # self.printAll(self.currTokens)
+        # print(self.currTokens)
         print(tuple(tok[0] for tok in self.currTokens))
         
         
@@ -237,8 +280,15 @@ class Parser(object):
                         break
                     
                     newToken = (matched, self.currTokens[n:],)
-                    # newToken = self.patterns.create(pattern, self.currTokens[n:])
+                    # I guess here I'm supposed to actually DO something with the matched tokens
+                    # instead of storing them
+                    # something something type checking something something code gen
                     print("reducing", pattern, "to", newToken[0])
+                    
+                    
+                    # do something here with callbacks?
+                    # callback = self.callback(matched)
+                    # if callback: callback()
                     
                     
                     self.currTokens = self.currTokens[:n]
@@ -247,7 +297,16 @@ class Parser(object):
                     break
                     
             if not reduced: reduceable = False
-        
+                
+    def callback(self, tok):
+        if tok == "procedure_header":
+            self.symTable.enter()
+            
+        elif tok == "procedure_declaration":
+            self.symTable.exit()
+            
+        # elif tok == "assignment_stmt":
+        # elif tok == "variable_declaration":
         
     
 
@@ -255,12 +314,29 @@ tokenGen = Scanner("test.src").scan()
 tree = Parser().parse(tokenGen)
 
 
+'''
+# My symbol table is A++
+
+# proves the theory works. yay!
+# can just hand off items
+test = SymTableItem(5)
+test2 = test
+
+test2.value = 6
+print(test2.value)
+print(test.value)
 
 
+# proves objects exist after deletion
+# and additionally keep value
+test = {"X": SymTableItem(5)}
+test2 = test["X"]
 
-
-
-
+test2.value = 6
+del test
+print(test2.value)
+# print(test.value)
+'''
 
 
 

@@ -317,6 +317,8 @@ class Scanner(object):
                     
                     currLine += 1
                     line = line.lower()
+                    # replace with bytes as file open in byte format
+                    line = line.replace(b"\t", b" ")
                     # print(repr(line))
                     
                     for char in line.decode('ascii'):
@@ -376,6 +378,8 @@ class Scanner(object):
                     
                     currLine += 1
                     line = line.lower()
+                    # replace with bytes as file in byte format
+                    line = line.replace(b"\t", b" ")
                     # print(repr(line))
                     
                     for char in line.decode('ascii'):
@@ -418,10 +422,10 @@ class Scanner(object):
         return tokens
 
 # tokenGen = Scanner("test.src").scan()
-# tokenGen = next(scan)
-# while (tokenGen is not None):
-    # print(tokenGen)
-    # tokenGen = next(scan)
+# tok = next(tokenGen)
+# while (tok is not None):
+    # print(tok)
+    # tok = next(tokenGen)
 
 # tokens = Scanner("test.src").oldScan()
 # for token in tokens: print(token)
