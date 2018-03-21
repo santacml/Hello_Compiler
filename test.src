@@ -2,6 +2,9 @@
 	/* nested comments; can you do it??
 	*/*/
 
+PROGRAM grant IS
 	global integer JAKE;
 	global integer ryan[3];
 	global integer zach;
+	begin
+end program.

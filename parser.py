@@ -3,14 +3,21 @@ from scanner import Scanner
         
 # this makes it so that multiple things can have reference to same value?
 class SymTableItem(object):
-    def __init__(self, value):
+    def __init__(self, value, valType, arrayType):
         self.value = value
+        self.valType = valType
+        self.arrayType = arrayType # false unless we say otherwise from setitem
         
+        # how to deal with arrays? problem for future me, I guess.
+        # here is where we will deal with conversions
+        # def add(self, other): if other.type=... and so on
+        # integer, float, bool, char
         
 
 class SymTable(object):
     def __init__(self):
-        self.core = {}
+        self.rootScope = {}
+        self.scopes = []
         self.currScope = None
         
     def exit(self):
@@ -32,29 +39,49 @@ class SymTable(object):
         if not (self.currScope == None):
             item = self.currScope.get(key, None)
         if not item:
-            item = self.core.get(key, None)
+            item = self.rootScope.get(key, None)
         if not item:
             print("Could not find symbol.")
             print("Could not find symbol.")
             
         return item
     
-    def __setitem__(self, key, value):
+    # def __setitem__(self, key, value, valType, arrayType=False):
+        # if not (self.currScope == None):
+            # self.currScope[key] = SymTableItem(value, valType, arrayType)
+        # else:
+            # self.rootScope[key] = SymTableItem(value, valType, arrayType)
+        
+    def declare(self, key, valType, arrayType=False):
+        # use none as default value
         if not (self.currScope == None):
-            self.currScope[key] = SymTableItem(value)
+            self.currScope[key] = SymTableItem(None, valType, arrayType)
+            # print("insert", key, "into currScope")
         else:
-            self.core[key] = SymTableItem(value)
+            self.rootScope[key] = SymTableItem(None, valType, arrayType)
+            # print("insert", key, "into rootScope")
         
     def __contains__(self, key):  
         contained = False
         if not (self.currScope == None):
             if key in self.currScope: contained = True
         
-        if ket in self.core: contained = True
+        if ket in self.rootScope: contained = True
         
         return contained
 
-class Patterns(object):
+class Pattern(object):
+    def __init__(self, value, children):
+        self.value = value
+        self.children = children
+        
+    def typeCheck(self):
+        pass
+        
+    def __str__(self):
+        return (self.value, [str(child) for child in self.children])
+        
+class PatternMatcher(object):
     def __init__(self):
         
         self.patterns = {
@@ -105,7 +132,7 @@ class Patterns(object):
             
             ("name", "assignment", "expression"): "assignment_stmt",
             
-            ("for", "lparen", "assignment_stmt", "semic", "statement", "rparen"): "loop_start",
+            ("for", "lparen", "assignment_stmt", "semic", "expression", "rparen"): "loop_start",
             ("loop_start", "statement", "semic",): "loop_start",
             ("loop_start", "end", "for",): "loop_stmt",
             
@@ -156,9 +183,11 @@ class Patterns(object):
             ("procedure", "identifier", "lparen", "rparen",): "procedure_header",
             ("procedure", "identifier", "lparen", "parameter_list","rparen"): "procedure_header",
             # takes care of  declarations before procedure
-            ("procedure_header", "declaration", "semic",): "procedure_header", 
+            # and name differently to allow increasing sym table only once
+            ("procedure_header", "declaration", "semic",): "procedure_header_w_vars", 
             
             ("procedure_header", "procedure_body",): "procedure_declaration",
+            ("procedure_header_w_vars", "procedure_body",): "procedure_declaration",
             
             ("global", "procedure_declaration",): "declaration",
             ("global", "variable_declaration",): "declaration",
@@ -170,7 +199,7 @@ class Patterns(object):
             
             # this doesn't work - when do we shift vs. reduce? (might reduce identifier)
             # ( i guess I could shift)
-            # (whatever fuck you)
+            # (whatever fuck it)
             # ("program", "identifier", "is",): "program_header",
             # this way, identifier isn't caught between shift and reduce
             ("program", "identifier",): "program_header_start",
@@ -183,10 +212,13 @@ class Patterns(object):
         
         self.shiftTable = {
             ("name", "assignment",): "__shift__", # for destination/assignment
+            ("identifier", "lbracket",): "__shift__", # to make sure names suck up vars[5]
             
+            # prevent terms getting sucked up
             ("term", "multiply",): "__shift__", 
             ("term", "divide", ): "__shift__", 
             
+            # prevent relations getting sucked up
             ("relation", "less",  ): "__shift__",
             ("relation", "lessequal", ): "__shift__",
             ("relation", "greater", ): "__shift__",
@@ -194,10 +226,15 @@ class Patterns(object):
             ("relation", "equalequal", ): "__shift__",
             ("relation", "notequal", ): "__shift__",
             
+            # arithOps
             ("arithOp", "plus", ): "__shift__",
             ("arithOp", "minus", ): "__shift__",
             
+            # argList
             ("expression", "comma",): "__shift__",
+            
+            ("for", "lparen", "assignment_stmt", "semic",): "__shift__", # prevent assignments getting sucked up
+            # ("for", "lparen", "assignment_stmt", "semic", "statement", "rparen"): "__shift__", # prevent statement getting sucked up
             
             ("if", "lparen", "expression", "rparen","then",): "__shift__",
             
@@ -226,17 +263,14 @@ class Patterns(object):
             lookAhead = self.shiftTable.get(lookAheadPattern, False) 
             if lookAhead == "__shift__":
                 matched = "__shift__"
-                print("FOUND LOOKAHEAD, USING SHIFT", lookAheadPattern)
+                # print("FOUND LOOKAHEAD, USING SHIFT", lookAheadPattern)
         
         return matched
         
 class Parser(object):
     def __init__(self):
         self.currTokens = []
-        # self.treeNode = Node("root", None) 
-        self.treeNode = None
-        self.patterns = Patterns()
-        self.currNodes = []
+        self.patternMatcher = PatternMatcher()
         self.symTable = SymTable()
         
     def parse(self, tokenGen):
@@ -258,6 +292,7 @@ class Parser(object):
         # print(self.currTokens)
         print(tuple(tok[0] for tok in self.currTokens))
         
+        return self.currTokens
         
             
     def reduce(self, lookAheadTok):
@@ -271,47 +306,148 @@ class Parser(object):
             # for n in range(len(self.currTokens)-1, -1,-1):
             for n in range(0,len(self.currTokens)):   # why did I ever do this
                 pattern = tuple(tok[0] for tok in self.currTokens[n:]) #idk if this works
-                print("pattern: ", pattern)
                 
-                matched = self.patterns.match(pattern, lookAheadTok)
-                if matched:
-                    if matched == "__shift__":
-                        reduceable = False
-                        break
-                    
-                    newToken = (matched, self.currTokens[n:],)
-                    # I guess here I'm supposed to actually DO something with the matched tokens
-                    # instead of storing them
-                    # something something type checking something something code gen
-                    print("reducing", pattern, "to", newToken[0])
-                    
-                    
-                    # do something here with callbacks?
-                    # callback = self.callback(matched)
-                    # if callback: callback()
-                    
-                    
-                    self.currTokens = self.currTokens[:n]
-                    self.currTokens.append(newToken)
-                    reduced = True
+                # print("pattern: ", pattern)  # very important for debug
+                
+                matched = self.patternMatcher.match(pattern, lookAheadTok)
+                
+                # collapse this if stmt, just continue if no match
+                # maybe do some error handling here instead?
+                # if matched:
+                if not matched: continue
+                
+                # if shift, stop everything and allow loop to break
+                if matched == "__shift__":
+                    reduceable = False
                     break
+                
+                # newToken = (matched, self.currTokens[n:],)
+                newToken = (matched, self.currTokens[n:],)
+                # newToken = [matched]
+                # newToken.extend(self.currTokens[n:])
+                # I guess here I'm supposed to actually DO something with the matched tokens
+                # instead of storing them
+                # something something type checking something something code gen
+                
+                # print("reducing", pattern, "to", newToken[0])  # very important for debug
+                
+                
+                # do something here with callbacks?
+                callbackPattern = self.callback(newToken)
+                if False and callbackPattern:
+                    # this is for simplifying the right side of tokens and also type checking
+                    # messing with the right side does nothing to affect parsing
+                    # from here on, callback does everything with type checking and sym table
+                    # parser just accepts whatever callback does
+                    
+                    # print("callback pattern", newToken)
+                    newToken = (matched, callbackPattern,)
+                # print(len(self.symTable.scopes))
+                
+                
+                self.currTokens = self.currTokens[:n]
+                self.currTokens.append(newToken)
+                reduced = True
+                break
                     
             if not reduced: reduceable = False
                 
-    def callback(self, tok):
-        if tok == "procedure_header":
+    def callback(self, newToken):
+        newPattern = None
+        matchedTok = newToken[0]
+        print(newToken)
+        
+        if matchedTok == "procedure_header":
             self.symTable.enter()
             
-        elif tok == "procedure_declaration":
+        elif matchedTok == "procedure_declaration":
             self.symTable.exit()
             
-        # elif tok == "assignment_stmt":
-        # elif tok == "variable_declaration":
+            
+        elif matchedTok == "variable_declaration":
+            # ("type_mark", "identifier"): "variable_declaration",
+            # ("type_mark", "identifier","lbracket", "number", "colon", "number", "rbracket"): "variable_declaration",
+            # ("type_mark", "identifier","lbracket", "expression", "rbracket"): "variable_declaration",
+            pattern = newToken[1]
+            name = pattern[1][1]  # ("identifier", "REALNAME")
+            tokType = pattern[0][1]
+            
+            # print("declaring", name, tokType)
+            # self.symTable[name] = 
+            arrayType = False
+            if len(newToken) > 2:
+                arrayType = True
+            
+            # how to specify array bounds?  idk, whatever
+            self.symTable.declare(name, tokType, arrayType)
+            
+            
+            
+        # elif matchedTok == "assignment_stmt":
         
+        
+        elif matchedTok == "type_mark":
+            # break down things into just their base form
+            # make integer just integer?
+            typeMark = newToken[1][0][1]   #("type_mark", (["integer", "integer"],),)
+            newPattern = typeMark
+            
+        # elif matchedTok == "name":
+            # ("identifier", "lbracket", "expression", "rbracket"): "name",
+            # ("identifier",): "name",
+            # print(newToken)
+            # print(newToken)
+            # print(newToken)
+            
+        # elif matchedTok == "factor":
+            # print(newToken)
+            # print(newToken)
+            # print(newToken)
+            
+            # gotta do allllllllll this type checking
+            
+            # ("lparen", "expression", "rparen"): "factor",
+            # ("minus", "name"): "factor",
+            # ("name",): "factor",
+            # ("minus", "number"): "factor",
+            # ("number",): "factor",
+            # ("string",): "factor",
+            # ("char",): "factor",
+            # ("true",): "factor",
+            # ("false",): "factor",
+            
+            # ("term", "multiply", "factor"): "term",
+            # ("term", "divide", "factor"): "term",
+            # ("factor",): "term",
+            
+            # ("relation", "less", "term"): "relation",
+            # ("relation", "lessequal", "term"): "relation",
+            # ("relation", "greater", "term"): "relation",
+            # ("relation", "greaterequal", "term"): "relation",
+            # ("relation", "equalequal", "term"): "relation",
+            # ("relation", "notequal", "term"): "relation",
+            # ("term",): "relation",
+            
+            # ("arithOp", "plus", "relation"): "arithOp",
+            # ("arithOp", "minus", "relation"): "arithOp",
+            # ("arithOp", "minus", "number"): "arithOp", # gross
+            # ("arithOp", "minus", "name"): "arithOp",   # but this fixes it? I guess?
+            # ("relation",): "arithOp",
+            
+            # ("expression", "and", "arithOp"): "expression",
+            # ("expression", "or", "arithOp"): "expression",
+            # ("not", "arithOp"): "expression",
+            # ("arithOp",): "expression",
+            
+            
+        return newPattern
+            
     
 
 tokenGen = Scanner("test.src").scan()
 tree = Parser().parse(tokenGen)
+
+print(tree)
 
 
 '''

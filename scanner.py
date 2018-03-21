@@ -351,7 +351,7 @@ class Scanner(object):
                 except ScanError as e:
                     print("Encountered error while scanning line: " + str(currLine )+ ".")
                     print(e)
-                    print(line.decode('ascii'), " " * (currCol-2) + "^")
+                    print(line.decode('ascii'), " " * (currCol) + "^")
                     print()
                     return
                     
