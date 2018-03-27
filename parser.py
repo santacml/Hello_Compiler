@@ -1,4 +1,6 @@
 from scanner import Scanner
+
+# err handling idea: at end, check tokens, if anything but comment or program is in there then error
         
 class ParseError(Exception): pass
 class TypeCheckError(Exception): pass
@@ -11,51 +13,60 @@ class Pattern(object):
         self.passedCheck = False
         self.resultType = self.tokType # default to this for leaf nodes??? I suppose?
         
+        self.name = None # make this for ease in getting declarations
+        self.arraySize = None  # for array variables..?
+        self.arrayStart = None  
+        
+        self.myList = [] # for both paramlist and arglist
+        
         if leaf:
             # print("got leaf", self.tokType, children)
             self.children = [Pattern(children, None)]
         
     def typeCheck(self, LINE_NUMBER, symTable):
-        # if self.children:
-            # print(self.tokType)
-            # for child in self.children:
-                # child.typeCheck()
-        # else:
-            # print(self.tokType)
         
-        lineErrStart = "Error on line: " + str(LINE_NUMBER) + ":\n"
+        lineErrStart = "\nError on line " + str(LINE_NUMBER) + ":\n"
         tokType = self.tokType
         numChildren = len(self.children)
         status = True
         
+        # numbers = ["float_number", "integer_number"]
+        numbers = ["float", "integer"]
+        bools = ["true", "false"]
         
         # all of these are the same for numChildren == 1 case
         # just assign resultType as the encapsulated item's resultType
-        if tokType in ["factor", "term", "relation", "arithOp", "expression"] and numChildren == 1:
-            bools = ["true", "false"]
+        if tokType in ["factor", "term", "relation", "arithOp", "expression", "number"] and numChildren == 1:
             self.resultType = self.children[0].resultType
-            # print("setting result type", tokType, self.children[0].resultType)
+            
+            # need the _number for parsing purposes, but from here on, chop it
+            if self.resultType == "float_number": self.resultType = "float"
+            if self.resultType == "integer_number": self.resultType = "integer"
+            
             if self.resultType in bools: self.resultType = "bool"
             
         elif tokType == "name":
             name = self.children[0].children[0].resultType
             
             if not name in symTable:
-                raise TypeCheckError(lineErrStart + "Variable or procedure not found.")
+                raise TypeCheckError(lineErrStart + "Variable or procedure name not found.")
             
-            self.resultType = tokType
+            symItem = symTable[name]
+            self.resultType = symItem.valType
             
         elif tokType == "factor":
             # covers 2 and 3
             
-            self.resultType = self.children[1].tokType
+            # fuuuuuuuuuuuuuuuuuuuuuuuuuck
+            # use resultType not tokType... dummy
+            self.resultType = self.children[1].resultType
                 
         elif tokType == "term":
             type1 = self.children[0].resultType
             type2 = self.children[2].resultType
             
             if type1 == type2:
-                if type1 != "number": raise TypeCheckError(lineErrStart + "Can only divide or multiply numbers.")
+                if not type1 in numbers : raise TypeCheckError(lineErrStart + "Can only divide or multiply numbers.")
                 self.resultType = type1
             else:
                 print(type1)
@@ -63,11 +74,13 @@ class Pattern(object):
                 raise TypeCheckError(lineErrStart + "Types do not match for division or multiplication.")
                 
         elif tokType == "relation":
-            relationTypes = ["number", "bool"]
+            relationTypes =  ["bool"] + numbers
             type1 = self.children[0].resultType
             type2 = self.children[2].resultType
             
-            if not type1 in relationTypes or not type2 in relationTypes: 
+            if not type1 in relationTypes or not type2 in relationTypes:
+                print(type1)
+                print(type2)
                 raise TypeCheckError(lineErrStart + "Relations can only compare numbers and bools.")
                 
             self.resultType = "bool"
@@ -76,13 +89,16 @@ class Pattern(object):
             type1 = self.children[0].resultType
             type2 = self.children[2].resultType
             
-            if type1 != "number" or type2 != "number":
+            if not type1 in numbers or not type2 in numbers:
                 raise TypeCheckError(lineErrStart + "Arithmetic Ops can only operate on numbers.")
                 
-            self.resultType = "number"
+            if type1=="float" or type2=="float":
+                self.resultType = "float"
+            else:
+                self.resultType = "integer"
             
         elif tokType == "expression":
-            exprTypes = ["bool", "number"]
+            exprTypes = ["bool"] + numbers
             
             if numChildren == 2:
                 self.resultType = self.children[1].resultType
@@ -95,14 +111,72 @@ class Pattern(object):
                 else:
                     raise TypeCheckError(lineErrStart + "Expression can only operate on numbers and bools.")
             
-        elif tokType == "argument_list":
-            pass
+        elif tokType == "assignment_stmt":
+            # ("name", "assignment", "expression"): "assignment_stmt",
+            name = self.grabLeafValue(0)
+            item = symTable[name]
+            
+            if item.valType != self.children[2].resultType:
+                
+                raise TypeCheckError(lineErrStart + "Assigned type " + self.children[2].resultType + " does not match declared type " + item.valType)
+            
+        elif tokType == "loop_start":
+            # ("for", "lparen", "assignment_stmt", "semic", "expression", "rparen"): "loop_start",
+            # ("loop_start", "statement", "semic",): "loop_start",
+            
+            # only need to check the real start, and only the expr
+            if len(self.children) == 6:
+                expr = self.children[4]
+                if expr.resultType != "bool": 
+                    raise TypeCheckError(lineErrStart + "Loops must use comparisons that evaluate to bools to evaluate if finished.")
+            
+        elif tokType == "parameter":
+            # ("variable_declaration", "in",): "parameter",
+            # ("variable_declaration", "out",): "parameter",
+            # ("variable_declaration", "inout",): "parameter",
+            
+            # idk how to handle in and out yet
+            child = self.children[0]
+            self.name = child.name
+            self.resultType = child.resultType
+            self.arraySize = child.arraySize
+            self.arrayStart = child.arrayStart
+            
+        elif tokType == "parameter_list":
+            # ("parameter",): "parameter_list",
+            # ("parameter_list", "comma", "parameter"): "parameter_list",
+            
+            if len(self.children) == 1:
+                self.myList.append(self.children[0])
+            else:
+                self.myList = self.children[0].myList
+                self.myList.append(self.children[2])
+                self.children[0].myList = [] # just save space
             
         elif tokType == "procedure_header":
-            symTable.enter()
+            # def __init__(self, valType, arraySize, arrayStart, params=None):
+            # ("procedure", "identifier", "lparen", "rparen",): "procedure_header",
+            # ("procedure", "identifier", "lparen", "parameter_list","rparen"): "procedure_header",
+            
+            self.name = self.grabLeafValue(1)
+            self.resultType = "procedure"
+            
+            symTableItemList = []
+            if len(self.children) > 4:
+                self.myList = self.children[3].myList
+                symTableItemList = [SymTableItem(item.resultType, item.arraySize, item.arrayStart) for item in self.myList]
+                
+            procSymTableItem = SymTableItem(self.resultType, 0, 0, symTableItemList)
+            
+            # add params to symtable as procedure item
+            symTable.enter(procName=self.name, procSymTableItem=procSymTableItem)
+            
+            # for item in self.myList:
+            for i in range(0, len(self.myList)):
+                symTable.declare(self.myList[i].name, symTableItemList[i])
             
         elif tokType == "procedure_declaration":
-            symTable.exit()
+            symTable.exit() # just need to exit
             
         elif tokType == "variable_declaration":
             declType = self.children[0].children[0].tokType
@@ -124,8 +198,11 @@ class Pattern(object):
                 arrayStart = start
                 
             elif numChildren == 5:
-                if self.children[3].resultType != "number":
-                    raise TypeCheckError(lineErrStart + "Array must be declared with a range or size.")
+                if not self.children[3].resultType == "integer":
+                    # need to check for negative array sizes????????
+                    # print(self.children[3].children[0].children[0].children[0].children[0].children[1].resultType)
+                    
+                    raise TypeCheckError(lineErrStart + "Array must be declared with an integer size.")
                 
                 token = self.grabLeafValue(3)
                     
@@ -134,16 +211,66 @@ class Pattern(object):
                 
             symTableItem = SymTableItem(declType, arraySize, arrayStart)
             symTable.declare(name, symTableItem)
-                
-                
-        # todo: 
-            # procedures in symtable, arglist checking, descent to negative num!
             
+            self.resultType = declType
+            self.name = name
+            self.arraySize = arraySize
+            self.arrayStart = arrayStart
+                
         elif tokType == "declaration":
-            # need to handle global, local, procedure and var
-            pass
+            if len(self.children) == 2:
+                # make sure I write out procedure_declaration!
+                symTable.promote(self.children[1].name)
+            else:
+                pass
+            
+        elif tokType == "argument_list":
+            if self.children[0].tokType == "expression":
+                self.myList.append(self.children[0])
+            else:
+                self.myList = self.children[0].myList
+                self.myList.append(self.children[2])
+                self.children[0].myList = [] # just save space
+            
         elif tokType == "procedure_call":
-            pass
+            # ("identifier", "lparen", "argument_list", "rparen",): "procedure_call",
+            # ("identifier", "lparen", "expression", "rparen",): "procedure_call", 
+            # ("identifier", "lparen", "rparen",): "procedure_call", 
+            
+            procName = self.grabLeafValue(0)
+            # if not procName in symTable: # this is actually handled by name if stmt
+            
+            if len(self.children) == 3:
+                pass
+            elif len(self.children) == 4:
+                # need to check if arglist or expression
+                # then check each individual thing
+                if self.children[2].tokType == "expression":
+                    self.myList.append(self.children[2])  # does not have an arglist
+                else: 
+                    self.myList = self.children[2].myList # has an arglist
+            
+            symTableItemList = [SymTableItem(item.resultType, item.arraySize, item.arrayStart) for item in self.myList]
+            
+            procItem = symTable[procName] # should not fail...
+            procParams = procItem.params
+            
+            if len(procParams) != len(symTableItemList):
+                print(len(procParams) )
+                print(len(symTableItemList))
+                raise TypeCheckError(lineErrStart + "Number of arguments given to procedure does not match number of procedure parameters.")
+            
+            for i in range(0, len(procParams)):
+                arg = symTableItemList[i]
+                param = procParams[i]
+                
+                if arg.valType != param.valType: 
+                    raise TypeCheckError(lineErrStart + "Argument " + str(i) + " does not match type for procedure parameter")
+                elif arg.arraySize != param.arraySize: 
+                    raise TypeCheckError(lineErrStart + "Argument " + str(i) + " does not match array size for procedure parameter")
+                elif arg.arrayStart != param.arrayStart: 
+                    raise TypeCheckError(lineErrStart + "Argument " + str(i) + " does not match array start location for procedure parameter")
+            
         
         self.passedCheck = status
         
@@ -251,10 +378,12 @@ class Pattern(object):
         
         token = child.tokType
         
-        if len(grandParent.children) == 2:
+        if grandParent and len(grandParent.children) == 2:
             # handle negative numbers
             possibleNeg = grandParent.children[0].children[0].tokType
-            possibleNum = grandParent.children[1].children[0].tokType
+            
+            #because I made integer_num and float_num go down one more level
+            possibleNum = grandParent.children[1].children[0].children[0].tokType 
             
             if possibleNeg == "-":
                 token = possibleNeg + possibleNum
@@ -262,26 +391,23 @@ class Pattern(object):
         
         return token
         
-    # def __str__(self):
-        # if self.children:
-            # return (self.tokType, [str(child) for child in self.children])
-        
-        # return (self.tokType, None)
-        
-# this makes it so that multiple things can have reference to same value?
 class SymTableItem(object):
-    def __init__(self, valType, arraySize, arrayStart):
+    def __init__(self, valType, arraySize, arrayStart, params=None):
         self.valType = valType
         if not arraySize: self.arrayType = False # false unless >0
         self.arraySize = arraySize
         self.arrayStart = arrayStart
         
-
+        self.params = params # only for procedures....
+        
 class SymTable(object):
     def __init__(self):
         self.rootScope = {}
+        self.currScope = self.rootScope  # start off at root level
+        self.globalScope = {} # global always accessible, root is just not any more local scopes
         self.scopes = []
-        self.currScope = None
+        
+        self.inALocalScope = False
         
     def exit(self):
         # i can delete scopes and it's fine
@@ -291,21 +417,33 @@ class SymTable(object):
         if len(self.scopes) > 0:
             self.currScope = self.scopes[-1]
         else:
-            self.currScope = None
+            self.currScope = self.rootScope
+            self.inALocalScope = False
         
-    def enter(self):
+    def enter(self, procName=None, procSymTableItem=None):   # only time entering is with a proc? I guess? Idk...
         self.scopes.append({})
+        self.parentScope = self.currScope
         self.currScope = self.scopes[-1]
+        
+        if procName:
+            if not procSymTableItem: raise ParseError("Incorrect usage of enter.")
+            self.parentScope[procName] = procSymTableItem
+            self.currScope[procName] = procSymTableItem
+                
+        
+        self.inALocalScope = True
         
     def __getitem__(self, key):
         item = None
-        if not (self.currScope == None):
+        if self.inALocalScope:
             item = self.currScope.get(key, None)
-        if not item:
+        else:
             item = self.rootScope.get(key, None)
+            
         if not item:
-            print("Could not find symbol.")
-            print("Could not find symbol.")
+            item = self.globalScope.get(key, None)
+        if not item:
+            raise ParseError("Could not find symbol:", key)
             
         return item
     
@@ -315,24 +453,33 @@ class SymTable(object):
         # else:
             # self.rootScope[key] = SymTableItem(value, valType, arrayType)
         
+    def promote(self, key):
+        if key in self.currScope:
+            self.globalScope[key] = self.currScope[key]
+            del self.currScope[key]
+        elif key not in self.globalScope:
+            raise ParseError("Error promoting var.")
+        
     def declare(self, key, symTableItem):
-        # use none as default value
-        if self.currScope:
+        # use rootScope as default value
+        if self.inALocalScope:
             self.currScope[key] = symTableItem 
             # print("insert", key, valType, "into currScope")
         else:
             self.rootScope[key] = symTableItem
             # print("insert", key, valType, "into rootScope")
         
+        
     def __contains__(self, key):  
         contained = False
-        if self.currScope:
+        if self.inALocalScope:
             if key in self.currScope: contained = True
+        else:
+            if key in self.rootScope: contained = True
         
-        if key in self.rootScope: contained = True
+        if key in self.globalScope: contained = True
         
         return contained
-
         
 class PatternMatcher(object):
     def __init__(self):
@@ -340,6 +487,10 @@ class PatternMatcher(object):
         self.patterns = {
             ("identifier", "lbracket", "expression", "rbracket"): "name",
             ("identifier",): "name",
+            
+            # i introduce these to make my life much easier
+            ("integer_number",): "number",
+            ("float_number",): "number",
             
             ("lparen", "expression", "rparen"): "factor",
             ("minus", "name"): "factor",
@@ -547,12 +698,24 @@ class Parser(object):
                 currTok = Pattern(lookAhead[0], lookAhead[1], leaf=True)
             else:
                 currTok = lookAhead
+            
             lookAhead = next(tokenGen) if lookAhead is not None else None # now THAT's python
             # print(lookAhead)
             # print(scanner.LINE_NUMBER)
             
         # print(self.currTokens)
         # print(tuple(tok[0] for tok in self.currTokens))
+        
+        validEndTypes = ["program", "block_comment", "comment"]
+        endTokTypes = [tok.tokType for tok in self.currTokens]
+        
+        checkValid = [tokType in validEndTypes for tokType in endTokTypes]
+        if False in checkValid:
+            badLoc = checkValid.index(False) # can put this in if stmt w/e
+            print(badLoc)
+            print(endTokTypes[badLoc])
+            # this sucks ass.......
+            raise ParseError("Error parsing.")
         
         return self.currTokens
         

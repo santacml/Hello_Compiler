@@ -96,7 +96,7 @@ class Identifier(StateMachine):
         
 class Number(StateMachine):
     def __init__(self):
-        StateMachine.__init__(self, "number")
+        StateMachine.__init__(self, "integer_number")
         self.states = {
             ".": DecimalNum()
         }
@@ -106,7 +106,7 @@ class Number(StateMachine):
         
 class DecimalNum(StateMachine):
     def __init__(self):
-        StateMachine.__init__(self, "decimalnum")
+        StateMachine.__init__(self, "float_number")
         self.states = {}
 
         for num in nums:
