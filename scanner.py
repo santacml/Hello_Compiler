@@ -32,7 +32,6 @@ class ScanError(Exception): pass
 alphabet = "abcdefghijklmnopqrstuvwxyz"
 nums = "0123456789"
 
-
 class StateMachine(object):
     def __init__(self, name):
         self.states = {}
@@ -298,10 +297,13 @@ class MasterMachine(StateMachine):
         self.ended = False
         return self
         
+        
 # with open("test.src", 'r', newline="\n") as f:
 class Scanner(object):
+    
     def __init__(self, file):
         self.file = file
+        self.LINE_NUMBER = 0
         
     def scan(self):
         with open(self.file, 'rb') as f:
@@ -316,6 +318,7 @@ class Scanner(object):
                         machine = masterMachine.clear()
                     
                     currLine += 1
+                    self.LINE_NUMBER = currLine
                     line = line.lower()
                     # replace with bytes as file open in byte format
                     line = line.replace(b"\t", b" ")

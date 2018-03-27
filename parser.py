@@ -1,17 +1,280 @@
 from scanner import Scanner
         
+class ParseError(Exception): pass
+class TypeCheckError(Exception): pass
+        
+class Pattern(object):
+    def __init__(self, tokType, children, leaf=False):
+        self.tokType = tokType
+        self.children = children
+        
+        self.passedCheck = False
+        self.resultType = self.tokType # default to this for leaf nodes??? I suppose?
+        
+        if leaf:
+            # print("got leaf", self.tokType, children)
+            self.children = [Pattern(children, None)]
+        
+    def typeCheck(self, LINE_NUMBER, symTable):
+        # if self.children:
+            # print(self.tokType)
+            # for child in self.children:
+                # child.typeCheck()
+        # else:
+            # print(self.tokType)
+        
+        lineErrStart = "Error on line: " + str(LINE_NUMBER) + ":\n"
+        tokType = self.tokType
+        numChildren = len(self.children)
+        status = True
+        
+        
+        # all of these are the same for numChildren == 1 case
+        # just assign resultType as the encapsulated item's resultType
+        if tokType in ["factor", "term", "relation", "arithOp", "expression"] and numChildren == 1:
+            bools = ["true", "false"]
+            self.resultType = self.children[0].resultType
+            # print("setting result type", tokType, self.children[0].resultType)
+            if self.resultType in bools: self.resultType = "bool"
+            
+        elif tokType == "name":
+            name = self.children[0].children[0].resultType
+            
+            if not name in symTable:
+                raise TypeCheckError(lineErrStart + "Variable or procedure not found.")
+            
+            self.resultType = tokType
+            
+        elif tokType == "factor":
+            # covers 2 and 3
+            
+            self.resultType = self.children[1].tokType
+                
+        elif tokType == "term":
+            type1 = self.children[0].resultType
+            type2 = self.children[2].resultType
+            
+            if type1 == type2:
+                if type1 != "number": raise TypeCheckError(lineErrStart + "Can only divide or multiply numbers.")
+                self.resultType = type1
+            else:
+                print(type1)
+                print(type2)
+                raise TypeCheckError(lineErrStart + "Types do not match for division or multiplication.")
+                
+        elif tokType == "relation":
+            relationTypes = ["number", "bool"]
+            type1 = self.children[0].resultType
+            type2 = self.children[2].resultType
+            
+            if not type1 in relationTypes or not type2 in relationTypes: 
+                raise TypeCheckError(lineErrStart + "Relations can only compare numbers and bools.")
+                
+            self.resultType = "bool"
+            
+        elif tokType == "arithOp":
+            type1 = self.children[0].resultType
+            type2 = self.children[2].resultType
+            
+            if type1 != "number" or type2 != "number":
+                raise TypeCheckError(lineErrStart + "Arithmetic Ops can only operate on numbers.")
+                
+            self.resultType = "number"
+            
+        elif tokType == "expression":
+            exprTypes = ["bool", "number"]
+            
+            if numChildren == 2:
+                self.resultType = self.children[1].resultType
+                
+            elif numChildren == 3:
+                type1 = self.children[0].resultType
+                type2 = self.children[2].resultType
+                if type1 in exprTypes and type2 in exprTypes: 
+                    self.resultType = "bool"
+                else:
+                    raise TypeCheckError(lineErrStart + "Expression can only operate on numbers and bools.")
+            
+        elif tokType == "argument_list":
+            pass
+            
+        elif tokType == "procedure_header":
+            symTable.enter()
+            
+        elif tokType == "procedure_declaration":
+            symTable.exit()
+            
+        elif tokType == "variable_declaration":
+            declType = self.children[0].children[0].tokType
+            name = self.children[1].children[0].tokType
+            arraySize=0
+            arrayStart=0
+            if numChildren == 2:
+                pass
+            elif numChildren == 7:
+                # 5:10, already knows they are numbers
+                start = self.children[3].children[0].resultType 
+                end = self.children[5].children[0].resultType 
+                print(start)
+                print(end)
+                start = int(start)
+                end = int(end)
+                
+                arraySize = end - start
+                arrayStart = start
+                
+            elif numChildren == 5:
+                if self.children[3].resultType != "number":
+                    raise TypeCheckError(lineErrStart + "Array must be declared with a range or size.")
+                
+                token = self.grabLeafValue(3)
+                    
+                print(token)
+                arraySize = int(token)
+                
+            symTableItem = SymTableItem(declType, arraySize, arrayStart)
+            symTable.declare(name, symTableItem)
+                
+                
+        # todo: 
+            # procedures in symtable, arglist checking, descent to negative num!
+            
+        elif tokType == "declaration":
+            # need to handle global, local, procedure and var
+            pass
+        elif tokType == "procedure_call":
+            pass
+        
+        self.passedCheck = status
+        
+        self.patterns = {
+            
+            ("expression", "comma", "expression"): "argument_list",    # need to shift something
+            ("argument_list", "comma", "expression"): "argument_list",    #would result in errors. instead, try shifting
+            
+            ("identifier", "lparen", "argument_list", "rparen",): "procedure_call",
+            # this way, not all expressions are arglists. makes life easier
+            ("identifier", "lparen", "expression", "rparen",): "procedure_call", 
+            # can call procedure without args dummy
+            ("identifier", "lparen", "rparen",): "procedure_call", 
+            
+            ("name", "assignment", "expression"): "assignment_stmt",
+            
+            ("for", "lparen", "assignment_stmt", "semic", "expression", "rparen"): "loop_start",
+            ("loop_start", "statement", "semic",): "loop_start",
+            ("loop_start", "end", "for",): "loop_stmt",
+            
+            ("return",): "return_stmt",
+            
+            # destination is redundant with name???
+            # ("identifier","lbracket","expression","rbracket"): "destination",
+            # ("identifier",): "destination",
+            
+            ("if", "lparen", "expression", "rparen", "then", "statement", "semic",): "if_start",
+            ("if_start", "statement","semic",): "if_start",
+            ("if_start", "else", "statement", "semic",): "else_start",
+            ("else_start", "statement", "semic",): "else_start",
+            ("if_start", "end", "if",): "if_stmt",
+            ("else_start", "end", "if"): "if_stmt",
+            
+            ("assignment_stmt",): "statement",
+            ("if_stmt",): "statement",
+            ("loop_stmt",): "statement",
+            ("return_stmt",): "statement",
+            ("procedure_call",): "statement",
+            
+            ("integer",): "type_mark",
+            ("float",): "type_mark",
+            ("string",): "type_mark",
+            ("bool",): "type_mark",
+            ("char",): "type_mark",
+            
+            # could mess around with lower/upper bound, no real point
+            ("type_mark", "identifier"): "variable_declaration",
+            ("type_mark", "identifier","lbracket", "number", "colon", "number", "rbracket"): "variable_declaration",
+            ("type_mark", "identifier","lbracket", "expression", "rbracket"): "variable_declaration",
+            # do bounds always have to be numbers...?
+            
+            
+            
+            ("begin",): "procedure_body_start",
+            ("procedure_body_start", "statement", "semic",): "procedure_body_start",
+            ("procedure_body_start", "end", "procedure",): "procedure_body",
+            
+            ("variable_declaration", "in",): "parameter",
+            ("variable_declaration", "out",): "parameter",
+            ("variable_declaration", "inout",): "parameter",
+            
+            ("parameter",): "parameter_list",
+            ("parameter_list", "comma", "parameter"): "parameter_list",
+            
+            ("procedure", "identifier", "lparen", "rparen",): "procedure_header",
+            ("procedure", "identifier", "lparen", "parameter_list","rparen"): "procedure_header",
+            # takes care of  declarations before procedure
+            # and name differently to allow increasing sym table only once
+            ("procedure_header", "declaration", "semic",): "procedure_header_w_vars", 
+            
+            ("procedure_header", "procedure_body",): "procedure_declaration",
+            ("procedure_header_w_vars", "procedure_body",): "procedure_declaration",
+            
+            ("global", "procedure_declaration",): "declaration",
+            ("global", "variable_declaration",): "declaration",
+            ("procedure_declaration",): "declaration",
+            ("variable_declaration",): "declaration",
+            
+            # all programs are procedures until the end?
+            ("procedure_body_start", "end", "program",): "program_body", 
+            
+            # this doesn't work - when do we shift vs. reduce? (might reduce identifier)
+            # ( i guess I could shift)
+            # (whatever fuck it)
+            # ("program", "identifier", "is",): "program_header",
+            # this way, identifier isn't caught between shift and reduce
+            ("program", "identifier",): "program_header_start",
+            ("program_header_start", "is"): "program_header",
+            
+            ("program_header", "declaration", "semic",): "program_header",
+            
+            ("program_header", "program_body", "period"): "program",
+        }
+        
+    def grabLeafValue(self, childLoc):
+        # if we know this is just some encapsulated number or other such value
+        #  descend until the number is obtained
+        grandParent = None
+        parent = self.children[childLoc]
+        child = self.children[childLoc].children[0]
+        while child.children:
+            grandParent = parent
+            parent = child
+            child = parent.children[0]
+        
+        token = child.tokType
+        
+        if len(grandParent.children) == 2:
+            # handle negative numbers
+            possibleNeg = grandParent.children[0].children[0].tokType
+            possibleNum = grandParent.children[1].children[0].tokType
+            
+            if possibleNeg == "-":
+                token = possibleNeg + possibleNum
+             
+        
+        return token
+        
+    # def __str__(self):
+        # if self.children:
+            # return (self.tokType, [str(child) for child in self.children])
+        
+        # return (self.tokType, None)
         
 # this makes it so that multiple things can have reference to same value?
 class SymTableItem(object):
-    def __init__(self, value, valType, arrayType):
-        self.value = value
+    def __init__(self, valType, arraySize, arrayStart):
         self.valType = valType
-        self.arrayType = arrayType # false unless we say otherwise from setitem
-        
-        # how to deal with arrays? problem for future me, I guess.
-        # here is where we will deal with conversions
-        # def add(self, other): if other.type=... and so on
-        # integer, float, bool, char
+        if not arraySize: self.arrayType = False # false unless >0
+        self.arraySize = arraySize
+        self.arrayStart = arrayStart
         
 
 class SymTable(object):
@@ -52,34 +315,24 @@ class SymTable(object):
         # else:
             # self.rootScope[key] = SymTableItem(value, valType, arrayType)
         
-    def declare(self, key, valType, arrayType=False):
+    def declare(self, key, symTableItem):
         # use none as default value
-        if not (self.currScope == None):
-            self.currScope[key] = SymTableItem(None, valType, arrayType)
-            # print("insert", key, "into currScope")
+        if self.currScope:
+            self.currScope[key] = symTableItem 
+            # print("insert", key, valType, "into currScope")
         else:
-            self.rootScope[key] = SymTableItem(None, valType, arrayType)
-            # print("insert", key, "into rootScope")
+            self.rootScope[key] = symTableItem
+            # print("insert", key, valType, "into rootScope")
         
     def __contains__(self, key):  
         contained = False
-        if not (self.currScope == None):
+        if self.currScope:
             if key in self.currScope: contained = True
         
-        if ket in self.rootScope: contained = True
+        if key in self.rootScope: contained = True
         
         return contained
 
-class Pattern(object):
-    def __init__(self, value, children):
-        self.value = value
-        self.children = children
-        
-    def typeCheck(self):
-        pass
-        
-    def __str__(self):
-        return (self.value, [str(child) for child in self.children])
         
 class PatternMatcher(object):
     def __init__(self):
@@ -273,8 +526,13 @@ class Parser(object):
         self.patternMatcher = PatternMatcher()
         self.symTable = SymTable()
         
-    def parse(self, tokenGen):
+        self.scanner = None 
+        
+    def parse(self, scanner):
+        self.scanner = scanner
+        tokenGen = scanner.scan()
         currTok = next(tokenGen)
+        currTok = Pattern(currTok[0],currTok[1], leaf=True)
         lookAhead = next(tokenGen)
         
         while(currTok is not None):
@@ -285,12 +543,16 @@ class Parser(object):
             self.reduce(lookAhead)
             # print(self.currTokens)
             
-            currTok = lookAhead
+            if lookAhead:
+                currTok = Pattern(lookAhead[0], lookAhead[1], leaf=True)
+            else:
+                currTok = lookAhead
             lookAhead = next(tokenGen) if lookAhead is not None else None # now THAT's python
-        
+            # print(lookAhead)
+            # print(scanner.LINE_NUMBER)
             
         # print(self.currTokens)
-        print(tuple(tok[0] for tok in self.currTokens))
+        # print(tuple(tok[0] for tok in self.currTokens))
         
         return self.currTokens
         
@@ -304,8 +566,9 @@ class Parser(object):
         while(reduceable):
             if reduced: reduced = False
             # for n in range(len(self.currTokens)-1, -1,-1):
-            for n in range(0,len(self.currTokens)):   # why did I ever do this
-                pattern = tuple(tok[0] for tok in self.currTokens[n:]) #idk if this works
+            for n in range(0,len(self.currTokens)):  
+                # pattern = tuple(tok[0] for tok in self.currTokens[n:]) 
+                pattern = tuple(tok.tokType for tok in self.currTokens[n:]) #idk if this works
                 
                 # print("pattern: ", pattern)  # very important for debug
                 
@@ -322,27 +585,16 @@ class Parser(object):
                     break
                 
                 # newToken = (matched, self.currTokens[n:],)
-                newToken = (matched, self.currTokens[n:],)
-                # newToken = [matched]
-                # newToken.extend(self.currTokens[n:])
+                
+                newToken = Pattern(matched, self.currTokens[n:])
+                newToken.typeCheck(self.scanner.LINE_NUMBER, self.symTable)
+                
                 # I guess here I'm supposed to actually DO something with the matched tokens
                 # instead of storing them
                 # something something type checking something something code gen
                 
-                # print("reducing", pattern, "to", newToken[0])  # very important for debug
+                # print("reducing", pattern, "to", newToken.tokType)  # very important for debug
                 
-                
-                # do something here with callbacks?
-                callbackPattern = self.callback(newToken)
-                if False and callbackPattern:
-                    # this is for simplifying the right side of tokens and also type checking
-                    # messing with the right side does nothing to affect parsing
-                    # from here on, callback does everything with type checking and sym table
-                    # parser just accepts whatever callback does
-                    
-                    # print("callback pattern", newToken)
-                    newToken = (matched, callbackPattern,)
-                # print(len(self.symTable.scopes))
                 
                 
                 self.currTokens = self.currTokens[:n]
@@ -351,103 +603,15 @@ class Parser(object):
                 break
                     
             if not reduced: reduceable = False
-                
-    def callback(self, newToken):
-        newPattern = None
-        matchedTok = newToken[0]
-        print(newToken)
-        
-        if matchedTok == "procedure_header":
-            self.symTable.enter()
-            
-        elif matchedTok == "procedure_declaration":
-            self.symTable.exit()
-            
-            
-        elif matchedTok == "variable_declaration":
-            # ("type_mark", "identifier"): "variable_declaration",
-            # ("type_mark", "identifier","lbracket", "number", "colon", "number", "rbracket"): "variable_declaration",
-            # ("type_mark", "identifier","lbracket", "expression", "rbracket"): "variable_declaration",
-            pattern = newToken[1]
-            name = pattern[1][1]  # ("identifier", "REALNAME")
-            tokType = pattern[0][1]
-            
-            # print("declaring", name, tokType)
-            # self.symTable[name] = 
-            arrayType = False
-            if len(newToken) > 2:
-                arrayType = True
-            
-            # how to specify array bounds?  idk, whatever
-            self.symTable.declare(name, tokType, arrayType)
-            
-            
-            
-        # elif matchedTok == "assignment_stmt":
-        
-        
-        elif matchedTok == "type_mark":
-            # break down things into just their base form
-            # make integer just integer?
-            typeMark = newToken[1][0][1]   #("type_mark", (["integer", "integer"],),)
-            newPattern = typeMark
-            
-        # elif matchedTok == "name":
-            # ("identifier", "lbracket", "expression", "rbracket"): "name",
-            # ("identifier",): "name",
-            # print(newToken)
-            # print(newToken)
-            # print(newToken)
-            
-        # elif matchedTok == "factor":
-            # print(newToken)
-            # print(newToken)
-            # print(newToken)
-            
-            # gotta do allllllllll this type checking
-            
-            # ("lparen", "expression", "rparen"): "factor",
-            # ("minus", "name"): "factor",
-            # ("name",): "factor",
-            # ("minus", "number"): "factor",
-            # ("number",): "factor",
-            # ("string",): "factor",
-            # ("char",): "factor",
-            # ("true",): "factor",
-            # ("false",): "factor",
-            
-            # ("term", "multiply", "factor"): "term",
-            # ("term", "divide", "factor"): "term",
-            # ("factor",): "term",
-            
-            # ("relation", "less", "term"): "relation",
-            # ("relation", "lessequal", "term"): "relation",
-            # ("relation", "greater", "term"): "relation",
-            # ("relation", "greaterequal", "term"): "relation",
-            # ("relation", "equalequal", "term"): "relation",
-            # ("relation", "notequal", "term"): "relation",
-            # ("term",): "relation",
-            
-            # ("arithOp", "plus", "relation"): "arithOp",
-            # ("arithOp", "minus", "relation"): "arithOp",
-            # ("arithOp", "minus", "number"): "arithOp", # gross
-            # ("arithOp", "minus", "name"): "arithOp",   # but this fixes it? I guess?
-            # ("relation",): "arithOp",
-            
-            # ("expression", "and", "arithOp"): "expression",
-            # ("expression", "or", "arithOp"): "expression",
-            # ("not", "arithOp"): "expression",
-            # ("arithOp",): "expression",
-            
-            
-        return newPattern
             
     
 
-tokenGen = Scanner("test.src").scan()
-tree = Parser().parse(tokenGen)
+scanner = Scanner("test.src")
+tokens = Parser().parse(scanner)
 
-print(tree)
+for tok in tokens:
+    print(tok.tokType)
+    # tok.typeCheck()
 
 
 '''
