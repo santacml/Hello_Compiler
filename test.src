@@ -21,10 +21,9 @@ program test_program is
         fibb(n-2, b);
 
         result := a + b;
-    end procedure;
+    end procedure;       
 begin
     fibb_result := -1234;
     fibb(12, fibb_result);
-    putInteger(fibb_result);
+    //putInteger(fibb_result);
 end program.
-XYZ123

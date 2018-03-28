@@ -335,7 +335,10 @@ class Scanner(object):
                             # print(machine.ended, machine.currStr, char)
                             if machine.currStr:
                                 # tokens.append(machine.terminate())
-                                yield machine.terminate()
+                                if machine.name == "block_comment" or machine.name == "comment":
+                                    pass # kill all comments
+                                else:
+                                    yield machine.terminate()
                             
                             
                             machine = masterMachine.clear().accept(char)
@@ -349,7 +352,11 @@ class Scanner(object):
                     # at end of line, terminate machine
                     if not (machine.name == "block_comment") and machine.currStr:
                         # tokens.append(machine.terminate())
-                        yield machine.terminate()
+                        if machine.name == "block_comment" or machine.name == "comment":
+                            pass # kill all comments
+                        else:
+                            yield machine.terminate()
+                    
                         
                 except ScanError as e:
                     print("Encountered error while scanning line: " + str(currLine )+ ".")
