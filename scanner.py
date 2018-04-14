@@ -302,11 +302,12 @@ class MasterMachine(StateMachine):
 class Scanner(object):
     
     def __init__(self, file):
-        self.file = file
+        # self.file = file
+        self.FILE_NAME = file
         self.LINE_NUMBER = 0
         
     def scan(self):
-        with open(self.file, 'rb') as f:
+        with open(self.FILE_NAME, 'rb') as f:
             currLine = 0
             masterMachine = MasterMachine()
             machine = masterMachine.clear()
@@ -375,7 +376,7 @@ class Scanner(object):
         
     def oldScan(self):
         tokens = []
-        with open(self.file, 'rb') as f:
+        with open(self.FILE_NAME, 'rb') as f:
             currLine = 0
             masterMachine = MasterMachine()
             machine = masterMachine.clear()

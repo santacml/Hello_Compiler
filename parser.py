@@ -1,5 +1,6 @@
 from scanner import Scanner
 from typeCheck import * 
+from irGenerator import IRGenerator
 
 class ParseError(Exception): pass
         
@@ -20,6 +21,10 @@ class Pattern(object):
         if leaf:
             # print("got leaf", self.tokType, children)
             self.children = [Pattern(children, None)]
+            
+        
+        self.irHandle = None
+        self.irHandleList = []
         
     def grabLeafValue(self, childLoc):
         # if we know this is just some encapsulated number or other such value
@@ -84,6 +89,7 @@ class PatternMatcher(object):
             ("arithOp", "minus", "relation"): "arithOp",
             ("arithOp", "minus", "number"): "arithOp", # gross
             ("arithOp", "minus", "name"): "arithOp",   # but this fixes it? I guess?
+            # IS THIS WRONG??????????
             ("relation",): "arithOp",
             
             ("expression", "and", "arithOp"): "expression",
@@ -102,8 +108,10 @@ class PatternMatcher(object):
             
             ("name", "assignment", "expression"): "assignment_stmt",
             
-            ("for", "lparen", "assignment_stmt", "semic", "expression", "rparen"): "loop_start",
+            ("for", "lparen","assignment_stmt", "semic"): "loop_open",
+            ("loop_open", "expression", "rparen"): "loop_start",
             ("loop_start", "statement", "semic",): "loop_start",
+            # ("end", "for",): "loop_end",
             ("loop_start", "end", "for",): "loop_stmt",
             
             ("return",): "return_stmt",
@@ -112,9 +120,11 @@ class PatternMatcher(object):
             # ("identifier","lbracket","expression","rbracket"): "destination",
             # ("identifier",): "destination",
             
-            ("if", "lparen", "expression", "rparen", "then", "statement", "semic",): "if_start",
+            # ("if", "lparen", "expression", "rparen", "then", "statement", "semic",): "if_start",
+            ("if", "lparen", "expression", "rparen", "then",): "if_start",  # get rid of stuff to catch stmts
             ("if_start", "statement","semic",): "if_start",
-            ("if_start", "else", "statement", "semic",): "else_start",
+            # ("if_start", "else", "statement", "semic",): "else_start",
+            ("if_start", "else", ): "else_start", # get rid of this to catch stmts
             ("else_start", "statement", "semic",): "else_start",
             ("if_start", "end", "if",): "if_stmt",
             ("else_start", "end", "if"): "if_stmt",
@@ -204,6 +214,8 @@ class PatternMatcher(object):
             # argList
             ("expression", "comma",): "__shift__",
             
+            
+            # ("loop_open", "assignment_stmt", "semic",): "__shift__", # prevent assignments getting sucked up
             ("for", "lparen", "assignment_stmt", "semic",): "__shift__", # prevent assignments getting sucked up
             # ("for", "lparen", "assignment_stmt", "semic", "statement", "rparen"): "__shift__", # prevent statement getting sucked up
             
@@ -221,6 +233,19 @@ class PatternMatcher(object):
             ("identifier", "lparen",): "__shift__", # for procedure calls
         }
         
+        self.enders =  (
+            "rbracket",
+            "semic",
+            "period",
+            "in",
+            "out"
+            "inout",
+            "procedure_body",
+            "is",
+            
+        
+        
+        )
         
     def match(self, pattern, lookAheadTok):
         matched = self.patterns.get(pattern, False) 
@@ -243,11 +268,16 @@ class Parser(object):
         self.currTokens = []
         self.patternMatcher = PatternMatcher()
         self.symTable = SymTable()
+        self.irGenerator = IRGenerator()
         
         self.scanner = None 
+        self.FILE_NAME = None
+        
         
     def parse(self, scanner):
         self.scanner = scanner
+        self.FILE_NAME = self.scanner.FILE_NAME
+        
         tokenGen = scanner.scan()
         currTok = next(tokenGen)
         currTok = Pattern(currTok[0],currTok[1], leaf=True)
@@ -266,8 +296,6 @@ class Parser(object):
                 currTok = lookAhead
             
             lookAhead = next(tokenGen) if lookAhead is not None else None # now THAT's python
-            # print(lookAhead)
-            # print(scanner.LINE_NUMBER)
             
         # print(self.currTokens)
         # print(tuple(tok[0] for tok in self.currTokens))
@@ -277,24 +305,30 @@ class Parser(object):
         
         checkValid = [tokType in validEndTypes for tokType in endTokTypes]
         if False in checkValid:
-            badLoc = checkValid.index(False) # can put this in if stmt w/e
-            print(badLoc)
-            print(endTokTypes[badLoc])
+            # badLoc = checkValid.index(False) # can put this in if stmt w/e
+            # print(badLoc)
+            # print(endTokTypes[badLoc])
             print(endTokTypes)
             # this sucks ass.......
-            raise ParseError("Error parsing.")
+            raise ParseError("Error parsing, could not figure out where.")
         
+        
+        self.irGenerator.bindAndRun()
         return self.currTokens
         
             
     def reduce(self, lookAheadTok):
         reduceable = True
-        reduced = False
-        err = False  # do this later... for now, blindly accept everything is A-OK
+        reduced = False # reduced once in a loop, gets reset
+        
+        onceReduced = False # something was reduced at least 1 time
         
         # needs to be here, multiple reduces in one reduce call IS possible
         while(reduceable):
-            if reduced: reduced = False
+            if reduced: 
+                reduced = False
+                onceReduced = True
+            
             # for n in range(len(self.currTokens)-1, -1,-1):
             for n in range(0,len(self.currTokens)):  
                 # pattern = tuple(tok[0] for tok in self.currTokens[n:]) 
@@ -317,8 +351,9 @@ class Parser(object):
                 # newToken = (matched, self.currTokens[n:],)
                 
                 newToken = Pattern(matched, self.currTokens[n:])
-                # newToken.typeCheck(self.scanner.LINE_NUMBER, self.symTable)
                 typeCheck(newToken, self.scanner.LINE_NUMBER, self.symTable)
+                
+                self.irGenerator.addIR(newToken, self.symTable) #UNCOMMENT ME
                 
                 # I guess here I'm supposed to actually DO something with the matched tokens
                 # instead of storing them
@@ -335,15 +370,26 @@ class Parser(object):
                     
             if not reduced: reduceable = False
             
-    
+        
+        # if not onceReduced:
+            # tok = self.currTokens[-1].tokType
+            # print(tok)
+            # if tok in self.patternMatcher.enders:   
+                # raise ParseError("Parse error on line",  self.scanner.LINE_NUMBER)
+                
+            # check if last token added was in definite reduce list
+            # if it was not then it's fine
+            # if it was then err
+        
 
 scanner = Scanner("test.src")
 tokens = Parser().parse(scanner)
 
-for tok in tokens:
-    print(tok.tokType)
-    # tok.typeCheck()
+# for tok in tokens:
+    # print(tok.tokType)
+    
 
+    
 
 '''
 # My symbol table is A++

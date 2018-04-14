@@ -1,9 +1,13 @@
 class TypeCheckError(Exception): pass
+class ParseError(Exception): pass
 
 class SymTableItem(object):
     def __init__(self, valType, arraySize, arrayStart, params=None):
         self.valType = valType
-        if not arraySize: self.arrayType = False # false unless >0
+        if arraySize: 
+            self.arrayType = True # false unless >0
+        else:
+            self.arrayType = False # false unless >0
         self.arraySize = arraySize
         self.arrayStart = arrayStart
         
@@ -219,6 +223,12 @@ def typeCheck(pattern, LINE_NUMBER, symTable):
             pattern.myList.append(pattern.children[2])
             pattern.children[0].myList = [] # just save space
         
+    elif tokType == "procedure_declaration":
+        pattern.name = pattern.children[0].name # just for helping later on
+        
+    elif tokType == "procedure_header_w_vars":
+        pattern.name = pattern.children[0].name # just for helping later on
+        
     elif tokType == "procedure_header":
         # def __init__(pattern, valType, arraySize, arrayStart, params=None):
         # ("procedure", "identifier", "lparen", "rparen",): "procedure_header",
@@ -230,6 +240,8 @@ def typeCheck(pattern, LINE_NUMBER, symTable):
         symTableItemList = []
         if len(pattern.children) > 4:
             pattern.myList = pattern.children[3].myList
+            
+            # handle out inout in vars here???
             symTableItemList = [SymTableItem(item.resultType, item.arraySize, item.arrayStart) for item in pattern.myList]
             
         procSymTableItem = SymTableItem(pattern.resultType, 0, 0, symTableItemList)
@@ -240,9 +252,6 @@ def typeCheck(pattern, LINE_NUMBER, symTable):
         # for item in pattern.myList:
         for i in range(0, len(pattern.myList)):
             symTable.declare(pattern.myList[i].name, symTableItemList[i])
-            
-            # this declares it
-        
         
     elif tokType == "variable_declaration":
         declType = pattern.children[0].children[0].tokType
@@ -349,94 +358,4 @@ def typeCheck(pattern, LINE_NUMBER, symTable):
     
     pattern.passedCheck = status
     
-    pattern.patterns = {
-        
-        ("expression", "comma", "expression"): "argument_list",    # need to shift something
-        ("argument_list", "comma", "expression"): "argument_list",    #would result in errors. instead, try shifting
-        
-        ("identifier", "lparen", "argument_list", "rparen",): "procedure_call",
-        # this way, not all expressions are arglists. makes life easier
-        ("identifier", "lparen", "expression", "rparen",): "procedure_call", 
-        # can call procedure without args dummy
-        ("identifier", "lparen", "rparen",): "procedure_call", 
-        
-        ("name", "assignment", "expression"): "assignment_stmt",
-        
-        ("for", "lparen", "assignment_stmt", "semic", "expression", "rparen"): "loop_start",
-        ("loop_start", "statement", "semic",): "loop_start",
-        ("loop_start", "end", "for",): "loop_stmt",
-        
-        ("return",): "return_stmt",
-        
-        # destination is redundant with name???
-        # ("identifier","lbracket","expression","rbracket"): "destination",
-        # ("identifier",): "destination",
-        
-        ("if", "lparen", "expression", "rparen", "then", "statement", "semic",): "if_start",
-        ("if_start", "statement","semic",): "if_start",
-        ("if_start", "else", "statement", "semic",): "else_start",
-        ("else_start", "statement", "semic",): "else_start",
-        ("if_start", "end", "if",): "if_stmt",
-        ("else_start", "end", "if"): "if_stmt",
-        
-        ("assignment_stmt",): "statement",
-        ("if_stmt",): "statement",
-        ("loop_stmt",): "statement",
-        ("return_stmt",): "statement",
-        ("procedure_call",): "statement",
-        
-        ("integer",): "type_mark",
-        ("float",): "type_mark",
-        ("string",): "type_mark",
-        ("bool",): "type_mark",
-        ("char",): "type_mark",
-        
-        # could mess around with lower/upper bound, no real point
-        ("type_mark", "identifier"): "variable_declaration",
-        ("type_mark", "identifier","lbracket", "number", "colon", "number", "rbracket"): "variable_declaration",
-        ("type_mark", "identifier","lbracket", "expression", "rbracket"): "variable_declaration",
-        # do bounds always have to be numbers...?
-        
-        
-        
-        ("begin",): "procedure_body_start",
-        ("procedure_body_start", "statement", "semic",): "procedure_body_start",
-        ("procedure_body_start", "end", "procedure",): "procedure_body",
-        
-        ("variable_declaration", "in",): "parameter",
-        ("variable_declaration", "out",): "parameter",
-        ("variable_declaration", "inout",): "parameter",
-        
-        ("parameter",): "parameter_list",
-        ("parameter_list", "comma", "parameter"): "parameter_list",
-        
-        ("procedure", "identifier", "lparen", "rparen",): "procedure_header",
-        ("procedure", "identifier", "lparen", "parameter_list","rparen"): "procedure_header",
-        # takes care of  declarations before procedure
-        # and name differently to allow increasing sym table only once
-        ("procedure_header", "declaration", "semic",): "procedure_header_w_vars", 
-        
-        ("procedure_header", "procedure_body",): "procedure_declaration",
-        ("procedure_header_w_vars", "procedure_body",): "procedure_declaration",
-        
-        ("global", "procedure_declaration",): "declaration",
-        ("global", "variable_declaration",): "declaration",
-        ("procedure_declaration",): "declaration",
-        ("variable_declaration",): "declaration",
-        
-        # all programs are procedures until the end?
-        ("procedure_body_start", "end", "program",): "program_body", 
-        
-        # this doesn't work - when do we shift vs. reduce? (might reduce identifier)
-        # ( i guess I could shift)
-        # (whatever fuck it)
-        # ("program", "identifier", "is",): "program_header",
-        # this way, identifier isn't caught between shift and reduce
-        ("program", "identifier",): "program_header_start",
-        ("program_header_start", "is"): "program_header",
-        
-        ("program_header", "declaration", "semic",): "program_header",
-        
-        ("program_header", "program_body", "period"): "program",
-    }
     
