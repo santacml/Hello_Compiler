@@ -26,6 +26,8 @@ class Pattern(object):
         self.irHandle = None
         self.irHandleList = []
         
+        self.parameterVal = None
+        
     def grabLeafValue(self, childLoc):
         # if we know this is just some encapsulated number or other such value
         #  descend until the number is obtained

@@ -176,19 +176,19 @@ class IRGenerator(object):
         
     def addIR(self, pattern, symTable):
         # todo
-        # in typecheck assignment, check if in.out.inout
+            # in typecheck assignment, check if in.out.inout
+            # should be done, in's are handled in typecheck, out and inout are declared beforehand?
+            # handle strings and chars... and arrays.. and type checking/conversions
+                # what else do i need to do? too many things...
+            
         # in if stmt, make it necessary for there to be at least 1 stmt!!!!!!!!!!!!!
-        # handle strings and chars... and arrays.. and type checking/conversions
+            # wat
+            # why
         
         # and main enemy: err handling
-        # idea: append a bunch of "ender" stmts
-        # if nothing reduces after e.g. semic, period, rbracket, etc
-        # then something is wrong, throw parse error
-        # conversions
-        # chars, strings
+        # is this still an issue?
         
-        # after that, pretty much done, just checking accuracy and refactoring
-        
+        # idk what these are:
         # make functino for each toktype
         # hashmap to functions
         # use a decorator for things like toktype numchildren op etc
@@ -285,6 +285,13 @@ class IRGenerator(object):
             
             lhs = pattern.children[0].irHandle
             rhs = pattern.children[2].irHandle
+            
+            if pattern.children[0].resultType == "bool":
+                lhs = self.builder.zext(lhs, ir.IntType(32))
+                
+            if pattern.children[2].resultType == "bool":
+                rhs = self.builder.zext(rhs, ir.IntType(32))
+                
             pattern.irHandle = self.builder.icmp_signed(op, lhs, rhs)
             
         elif tokType == "arithOp":
@@ -299,6 +306,11 @@ class IRGenerator(object):
             op = pattern.grabLeafValue(1)
             lhs = pattern.children[0].irHandle
             rhs = pattern.children[2].irHandle
+            
+            if pattern.children[0].resultType != pattern.children[2].resultType:
+                # one is float and one is int, convert both to float
+                lhs = self.builder.uitofp(lhs, ir.FloatType)
+                rhs = self.builder.uitofp(rhs, ir.FloatType)
             
             if op == "+":
                 pattern.irHandle = self.builder.add(lhs, rhs)
@@ -411,7 +423,6 @@ class IRGenerator(object):
             
             pattern.irHandle = bbbranch
             
-            
         elif tokType == "loop_start":
             firstChild = pattern.children[0]
             if firstChild.tokType == "loop_open":
@@ -448,7 +459,6 @@ class IRGenerator(object):
             self.builder.branch(loopHandle)  # loop back to the bbbranch to decide to keep going
             
             self.exitLoop() # position ptr to end of loop
-                
             
         elif tokType == "argument_list":
             argsToAdd = []
@@ -475,6 +485,7 @@ class IRGenerator(object):
                     
                     
             pattern.children[0].irHandleList = [] # just save space
+            
             
         elif tokType == "parameter_list":
             if numChildren == 1:
@@ -581,6 +592,7 @@ class IRGenerator(object):
                 self.builder.ret_void()
                 self.exitBuilder()
             else: 
+                # variable declaration
                 # ("type_mark", "identifier"): "variable_declaration",
                 # ("type_mark", "identifier","lbracket", "number", "colon", "number", "rbracket"): "variable_declaration",
                 # ("type_mark", "identifier","lbracket", "expression", "rbracket"): "variable_declaration",
@@ -625,6 +637,9 @@ class IRGenerator(object):
             
             self.builder.store(result, ptr)
             
+        elif tokType == "return_stmt":
+            self.builder.ret_void()
+            
             
             
         # for(i := 0; i < zach)
@@ -632,48 +647,36 @@ class IRGenerator(object):
         # end for;
             
         self.patterns = {
+            #done 
             ("for", "lparen","assignment_stmt", "semic"): "loop_open",
             ("loop_open", "expression", "rparen"): "loop_start",
             ("loop_start", "statement", "semic",): "loop_start",
-            # ("end", "for",): "loop_end",
             ("loop_start", "end", "for",): "loop_stmt",
-            
             ("return",): "return_stmt",
-            
-            # destination is redundant with name???
-            # ("identifier","lbracket","expression","rbracket"): "destination",
-            # ("identifier",): "destination",
-             
-            # ("if", "lparen", "expression", "rparen", "then", "statement", "semic",): "if_start", # get rid of this to catch stmts
             ("if", "lparen", "expression", "rparen", "then", ): "if_start",
             ("if_start", "statement","semic",): "if_start",
-            # ("if_start", "else", "statement", "semic",): "else_start",
             ("if_start", "else", ): "else_start", # get rid of this to catch stmts
             ("else_start", "statement", "semic",): "else_start",
             ("if_start", "end", "if",): "if_stmt",
             ("else_start", "end", "if"): "if_stmt",
-            
             ("assignment_stmt",): "statement",
             ("if_stmt",): "statement",
             ("loop_stmt",): "statement",
             ("return_stmt",): "statement",
             ("procedure_call",): "statement",
-            
-            # could mess around with lower/upper bound, no real point
             ("type_mark", "identifier"): "variable_declaration",
             ("type_mark", "identifier","lbracket", "number", "colon", "number", "rbracket"): "variable_declaration",
             ("type_mark", "identifier","lbracket", "expression", "rbracket"): "variable_declaration",
-            # do bounds always have to be numbers...?
-            
-            
-            
             ("begin",): "procedure_body_start",
             ("procedure_body_start", "statement", "semic",): "procedure_body_start",
             ("procedure_body_start", "end", "procedure",): "procedure_body",
             
+            
             ("variable_declaration", "in",): "parameter",
             ("variable_declaration", "out",): "parameter",
             ("variable_declaration", "inout",): "parameter",
+            
+            
             
             ("parameter",): "parameter_list",
             ("parameter_list", "comma", "parameter"): "parameter_list",

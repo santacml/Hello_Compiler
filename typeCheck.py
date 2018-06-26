@@ -2,7 +2,7 @@ class TypeCheckError(Exception): pass
 class ParseError(Exception): pass
 
 class SymTableItem(object):
-    def __init__(self, valType, arraySize, arrayStart, params=None):
+    def __init__(self, valType, arraySize, arrayStart, params=None, paramVal=None):
         self.valType = valType
         if arraySize: 
             self.arrayType = True # false unless >0
@@ -12,6 +12,7 @@ class SymTableItem(object):
         self.arrayStart = arrayStart
         
         self.params = params # only for procedures....
+        self.paramVal = paramVal
         
 class SymTable(object):
     def __init__(self):
@@ -187,8 +188,14 @@ def typeCheck(pattern, LINE_NUMBER, symTable):
         item = symTable[name]
         
         if item.valType != pattern.children[2].resultType:
+            types = [item.valType, pattern.children[2].resultType].sort()
             
-            raise TypeCheckError(lineErrStart + "Assigned type " + pattern.children[2].resultType + " does not match declared type " + item.valType)
+            if not (types == ["bool", "integer"] or type == ["float", "integer"]):
+                
+                raise TypeCheckError(lineErrStart + "Assigned type " + pattern.children[2].resultType + " does not match declared type " + item.valType)
+            
+        if item.paramVal == "in":
+            raise TypeCheckError(lineErrStart + "Variable " + name + " is a type 'in' variable and cannot be assigned to.")
         
     elif tokType == "loop_start":
         # ("for", "lparen", "assignment_stmt", "semic", "expression", "rparen"): "loop_start",
@@ -211,6 +218,8 @@ def typeCheck(pattern, LINE_NUMBER, symTable):
         pattern.resultType = child.resultType
         pattern.arraySize = child.arraySize
         pattern.arrayStart = child.arrayStart
+        
+        pattern.parameterVal =  pattern.grabLeafValue(1)
         
     elif tokType == "parameter_list":
         # ("parameter",): "parameter_list",
@@ -241,8 +250,8 @@ def typeCheck(pattern, LINE_NUMBER, symTable):
         if len(pattern.children) > 4:
             pattern.myList = pattern.children[3].myList
             
-            # handle out inout in vars here???
-            symTableItemList = [SymTableItem(item.resultType, item.arraySize, item.arrayStart) for item in pattern.myList]
+            symTableItemList = [SymTableItem(item.resultType, item.arraySize, item.arrayStart, paramVal=item.parameterVal) for item in pattern.myList]
+            
             
         procSymTableItem = SymTableItem(pattern.resultType, 0, 0, symTableItemList)
         

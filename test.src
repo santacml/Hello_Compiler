@@ -1,6 +1,6 @@
 program test_program is
     integer result;
-	procedure test(integer i in)
+	procedure test(integer i in, integer k in)
         integer result;
         integer asdf;
 		begin
@@ -17,6 +17,6 @@ program test_program is
             
 		end procedure;
 begin
-    test(result);
+    test(result, 4);
     result := 3 + 4;
 end program.
