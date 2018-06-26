@@ -28,6 +28,10 @@ class Pattern(object):
         
         self.parameterVal = None
         
+        # only use if this pattern is a name and references an array
+        # this is gross, not sure what else to do
+        self.arrayExprIRHandle = None 
+        
     def grabLeafValue(self, childLoc):
         # if we know this is just some encapsulated number or other such value
         #  descend until the number is obtained

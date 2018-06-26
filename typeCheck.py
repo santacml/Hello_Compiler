@@ -120,6 +120,9 @@ def typeCheck(pattern, LINE_NUMBER, symTable):
         if pattern.resultType in bools: pattern.resultType = "bool"
         
     elif tokType == "name":
+        # ("identifier", "lbracket", "expression", "rbracket"): "name",
+        # ("identifier",): "name",
+    
         name = pattern.children[0].children[0].resultType
         
         if not name in symTable:
@@ -128,6 +131,9 @@ def typeCheck(pattern, LINE_NUMBER, symTable):
         
         symItem = symTable[name]
         pattern.resultType = symItem.valType
+        
+        if len(pattern.children) == 4:
+            pattern.arrayExprIRHandle = pattern.children[2].irHandle
         
     elif tokType == "factor":
         # covers 2 and 3

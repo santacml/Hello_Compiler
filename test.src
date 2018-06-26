@@ -1,22 +1,29 @@
 program test_program is
-    integer result;
-	procedure test(integer i in, integer k in)
-        integer result;
-        integer asdf;
-		begin
-            /*
-            //if(true) then i := 5.0; should this error?
-            if(true) then i := 5;
-            else i := 0;
-            end if;
-            
-            */
-			for(asdf := 0; asdf < 5)
-				result := i;
-			end for;
-            
-		end procedure;
+    integer fibb_result;
+    procedure fibb(integer n in, integer result out)
+        integer a;
+        integer b;
+    begin
+        if (n < 0) then
+            result := -1;
+            return;
+        end if;
+        if (n == 0) then
+            result := 0;
+            return;
+        end if;
+        if (n == 1) then
+            result := 1;
+            return;
+        end if;
+        
+        fibb(n-1, a);
+        fibb(n-2, b);
+
+        result := a + b;
+    end procedure;
 begin
-    test(result, 4);
-    result := 3 + 4;
+    fibb_result := -1234;
+    fibb(12, fibb_result);
+    putInteger(fibb_result);
 end program.

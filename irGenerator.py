@@ -185,8 +185,13 @@ class IRGenerator(object):
             # wat
             # why
         
+        # EVERYTHING ABOUT ARRAYS
+            # loading a value requires int...
+            
+        # fib seems broken for some reason
+        
         # and main enemy: err handling
-        # is this still an issue?
+        # is this really still an issue?
         
         # idk what these are:
         # make functino for each toktype
@@ -252,9 +257,26 @@ class IRGenerator(object):
                 
                 # loads this value even for like assignments... ohwell
                 # print(symTable[name])
-                val = self.builder.load(symTable[name].irPtr)
+                if pattern.arrayExprIRHandle:
+                    #TODO future michael
+                    # cant figure out how to dynamically use llvm in array
+                    # as in, load array[i] 
+                    # as the python function requires an inteer
+                    
+                    # loc = pattern.grabLeafValue(2) #this is not how it should work
+                    # offset =  - pattern.arrayStart + int(loc)
+                    # val = self.builder.load(symTable[name].irPtr, align=offset)
+                    
+                    loc =  pattern.arrayExprIRHandle 
+                    loc = self.builder.add(loc, ir.Constant(ir.IntType(32), str(- pattern.arrayStart)))
+                    
+                    ptr = self.builder.load(symTable[name].irPtr)
+                    val = self.builder.extract_value(ptr, loc)
+                else:
+                    val = self.builder.load(symTable[name].irPtr)
+                    
+                # print(name, val)
                 pattern.irHandle = val
-                pass
             else:
                 pass # it has to be declaring when this happens. Hopefully. or something
             
@@ -486,7 +508,6 @@ class IRGenerator(object):
                     
             pattern.children[0].irHandleList = [] # just save space
             
-            
         elif tokType == "parameter_list":
             if numChildren == 1:
                 pattern.irHandleList.append(pattern.children[0].irHandle)
@@ -605,13 +626,19 @@ class IRGenerator(object):
                 
                 typ = None
                 if symItem.arrayType:
-                    typ = self.getType(symItem.valType, symItem.arraySize) #HOW TO DO OFFSET???
+                    typ = self.getType(symItem.valType, arr=True, arrSize=symItem.arraySize)
                 else:
                     typ = self.getType(child.resultType)
                 
                 if numChildren == 2:
+                    #honestly idk what this is for
                     pattern.irHandle = ir.GlobalVariable(self.module, typ, child.name)
                 else:
+                    #declaring a variable
+                    # alignSize = child.arraySize if child.arraySize else None
+                    # print(alignSize, child.name)
+                    # what actually is align??
+                    # pattern.irHandle = self.builder.alloca(typ, name=child.name, size=alignSize)
                     pattern.irHandle = self.builder.alloca(typ, name=child.name)
                 
                 
