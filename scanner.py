@@ -38,11 +38,11 @@ class StateMachine(object):
         self.name = name
         self.currStr = ""
         self.ended = False
-        
+
     def accept(self, newChar):
         # self.currChar = char
         nextState = None
-        
+
         for key, state in self.states.items():
             # print("checking key", key)
             # print(newChar)
@@ -51,24 +51,24 @@ class StateMachine(object):
                 state.currStr = self.currStr + newChar
                 nextState = state
                 # self.currStr = ""  #doesn't matter->gets overwritten 2 lines above when it matters
-        
+
         if not nextState:
             nextState = self
             self.ended = True
-        
+
         return nextState
-        
+
     def clear(self):
         self.currStr = ""
         self.ended = False
-        
-        
+
+
     def terminate(self, retVal=None):
-        if not retVal: 
-            retVal = (self.name, self.currStr) 
+        if not retVal:
+            retVal = (self.name, self.currStr)
         self.clear()
         return retVal
-        
+
 class Identifier(StateMachine):
     def __init__(self):
         StateMachine.__init__(self, "identifier")
@@ -79,21 +79,21 @@ class Identifier(StateMachine):
             self.states[letter] = self
         for num in nums:
             self.states[num] = self
-        
-        self.keywords = ("if", "then", "else", "end", "for", "not", "true", "false", 
-                         "integer", "float", "bool", "char", "procedure", "in", "out", "inout", 
+
+        self.keywords = ("if", "then", "else", "end", "for", "not", "true", "false",
+                         "integer", "float", "bool", "char", "procedure", "in", "out", "inout",
                          "begin", "program", "is", "global",
                          "return")
-        
+
     def terminate(self):
         retVal = None
         if self.currStr in self.keywords:
             retVal = (self.currStr, self.currStr)
         else:
             retVal =(self.name, self.currStr)
-        
+
         return super().terminate(retVal)
-        
+
 class Number(StateMachine):
     def __init__(self):
         StateMachine.__init__(self, "integer_number")
@@ -103,7 +103,7 @@ class Number(StateMachine):
 
         for num in nums:
             self.states[num] = self
-        
+
 class DecimalNum(StateMachine):
     def __init__(self):
         StateMachine.__init__(self, "float_number")
@@ -111,11 +111,11 @@ class DecimalNum(StateMachine):
 
         for num in nums:
             self.states[num] = self
-        
+
 class End(StateMachine):
     def __init__(self, name):
         StateMachine.__init__(self, name)
-        
+
     def terminate(self):
         # print(self.currStr)
         if self.name == "char":
@@ -123,9 +123,9 @@ class End(StateMachine):
                 raise ScanError("Ending needs to match")
             if len(self.currStr) is not 3:
                 raise ScanError("Char can only be one character")
-                
+
         return super().terminate()
-        
+
 class String(StateMachine):
     def __init__(self):
         # DOES NOT ALLOW UNDERSCORE... ???
@@ -143,56 +143,56 @@ class String(StateMachine):
             self.states[letter] = self
         for num in nums:
             self.states[num] = self
-        
+
     def terminate(self):
         raise ScanError("String must end with \"")
-        
+
 class Char(StateMachine):
     def __init__(self):
         StateMachine.__init__(self, "char")
         self.states = {
             "\'": End(self.name)
         }
-        
+
         for letter in alphabet:
             self.states[letter] = self
-        
+
     def terminate(self):
         raise ScanError("Char must end with '")
-        
+
 class Relation(StateMachine):
     def __init__(self, name):
         StateMachine.__init__(self, name)
         self.states = {
             "=": End(self.name + "equal")
         }
-    
+
     def terminate(self):
         if self.name == "not":
             raise ScanError("NotEqual must be exactly '!='")
         return super().terminate()
-        
+
 class Assignment(StateMachine):
     def __init__(self):
         StateMachine.__init__(self, "assignment")
         self.states = {
             "=": End("assignment")
         }
-        
+
     def terminate(self):
         raise ScanError("Assignment must be exactly ':='")
-        
+
 class DivideOrComment(StateMachine):
     def __init__(self):
         StateMachine.__init__(self, "divide")
         self.states = {}
         self.acceptedOneChar = False
-        
+
     def accept(self, newChar):
         nextState = None
         if not self.acceptedOneChar:
-            
-            #only goes in here once 
+
+            #only goes in here once
             self.acceptedOneChar = True
             # possibly a comment, need to check
             if newChar == "/":
@@ -201,7 +201,7 @@ class DivideOrComment(StateMachine):
                 self.currStr = self.currStr + newChar
                 nextState = self
             elif newChar == "*":
-                # found a block comment opening! /* 
+                # found a block comment opening! /*
                 self.acceptedOneChar = False
                 nextState = BlockComment()
                 # next str is /*
@@ -217,13 +217,13 @@ class DivideOrComment(StateMachine):
             #accept everything, forever
             self.currStr = self.currStr + newChar
             nextState = self
-        
+
         return nextState
-        
+
     def terminate(self):
         self.acceptedOneChar = False
         return super().terminate()
-        
+
 class BlockComment(StateMachine):
     def __init__(self):
         StateMachine.__init__(self, "block_comment")
@@ -232,14 +232,14 @@ class BlockComment(StateMachine):
         self.upLevelStart = False
         self.downLevelStart = False
         self.endNextPass = False
-        
+
     def accept(self, newChar):
         nextState = self
-        
+
         if self.endNextPass:
             self.ended = True
             return nextState
-        
+
         if self.upLevelStart:
             # check if adding a new level
             if newChar == "*":
@@ -249,7 +249,7 @@ class BlockComment(StateMachine):
             # check if going down a level
             if newChar == "/":
                 self.level -= 1
-                
+
                 if self.level == 0: self.endNextPass = True
             self.downLevelStart = False
         else:
@@ -257,8 +257,8 @@ class BlockComment(StateMachine):
                 self.upLevelStart = True
             elif newChar == "*":
                 self.downLevelStart = True
-        
-        
+
+
         self.currStr = self.currStr + newChar
         return nextState
 
@@ -291,21 +291,20 @@ class MasterMachine(StateMachine):
             self.states[letter] = Identifier()
         for num in nums:
             self.states[num] = Number()
-        
+
     def clear(self):
         self.currStr = ""
         self.ended = False
         return self
-        
-        
+
+
 # with open("test.src", 'r', newline="\n") as f:
 class Scanner(object):
-    
+
     def __init__(self, file):
-        # self.file = file
         self.FILE_NAME = file
         self.LINE_NUMBER = 0
-        
+
     def scan(self):
         with open(self.FILE_NAME, 'rb') as f:
             currLine = 0
@@ -317,22 +316,22 @@ class Scanner(object):
                     if not (machine.name == "block_comment"):
                         # if we are in a block comment, persist, otherwise reset
                         machine = masterMachine.clear()
-                    
+
                     currLine += 1
                     self.LINE_NUMBER = currLine
                     line = line.lower()
                     # replace with bytes as file open in byte format
                     line = line.replace(b"\t", b" ")
                     # print(repr(line))
-                    
+
                     for char in line.decode('ascii'):
                         currCol += 1
                         if char in ("\r\n", "\r", "\n"): continue #gets rid of newlines!
-                        
+
                         # print("now accepting", char)
                         machine = machine.accept(char)
-                        
-                        if machine.ended: 
+
+                        if machine.ended:
                             # print(machine.ended, machine.currStr, char)
                             if machine.currStr:
                                 # tokens.append(machine.terminate())
@@ -340,16 +339,16 @@ class Scanner(object):
                                     pass # kill all comments
                                 else:
                                     yield machine.terminate()
-                            
-                            
+
+
                             machine = masterMachine.clear().accept(char)
-                            if not machine.currStr and char is not " " :  
+                            if not machine.currStr and char is not " " :
                                 # token not found, also discard whitespace
                                 raise ScanError("Unexpected Token", char)
-                                
+
                             # print("made new machine with: " + char)
-                    
-                    
+
+
                     # at end of line, terminate machine
                     if not (machine.name == "block_comment") and machine.currStr:
                         # tokens.append(machine.terminate())
@@ -357,23 +356,23 @@ class Scanner(object):
                             pass # kill all comments
                         else:
                             yield machine.terminate()
-                    
-                        
+
+
                 except ScanError as e:
                     print("Encountered error while scanning line: " + str(currLine )+ ".")
                     print(e)
                     print(line.decode('ascii'), " " * (currCol) + "^")
                     print()
                     return
-                    
-            # this is specifically for files that end in a block comment... 
+
+            # this is specifically for files that end in a block comment...
             # I guess I don't really need this...
             if (machine.name == "block_comment") and machine.currStr:
                 yield machine.terminate()
-            
+
         yield
         yield
-        
+
     def oldScan(self):
         tokens = []
         with open(self.FILE_NAME, 'rb') as f:
@@ -386,50 +385,50 @@ class Scanner(object):
                     if not (machine.name == "block_comment"):
                         # if we are in a block comment, persist, otherwise reset
                         machine = masterMachine.clear()
-                    
+
                     currLine += 1
                     line = line.lower()
                     # replace with bytes as file in byte format
                     line = line.replace(b"\t", b" ")
                     # print(repr(line))
-                    
+
                     for char in line.decode('ascii'):
                         currCol += 1
                         if char in ("\r\n", "\r", "\n"): continue #gets rid of newlines!
-                        
+
                         # print("now accepting", char)
                         machine = machine.accept(char)
-                        
-                        if machine.ended: 
+
+                        if machine.ended:
                             # print(machine.ended, machine.currStr, char)
                             if machine.currStr:
                                 tokens.append(machine.terminate())
-                            
-                            
+
+
                             machine = masterMachine.clear().accept(char)
-                            if not machine.currStr and char is not " " :  
+                            if not machine.currStr and char is not " " :
                                 # token not found, also discard whitespace
                                 raise ScanError("Unexpected Token", char)
-                                
+
                             # print("made new machine with: " + char)
-                    
-                    
+
+
                     # at end of line, terminate machine
                     if not (machine.name == "block_comment") and machine.currStr:
                         tokens.append(machine.terminate())
-                        
+
                 except ScanError as e:
                     print("Encountered error while scanning line: " + str(currLine )+ ".")
                     print(e)
                     print(line.decode('ascii'), " " * (currCol-2) + "^")
                     print()
                     return
-                    
-            # this is specifically for files that end in a block comment... 
+
+            # this is specifically for files that end in a block comment...
             # I guess I don't really need this...
             if (machine.name == "block_comment") and machine.currStr:
                 tokens.append(machine.terminate())
-            
+
         return tokens
 
 # tokenGen = Scanner("test.src").scan()
@@ -440,10 +439,3 @@ class Scanner(object):
 
 # tokens = Scanner("test.src").oldScan()
 # for token in tokens: print(token)
-
-
-
-
-
-
-

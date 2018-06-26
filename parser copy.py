@@ -270,20 +270,21 @@ class PatternMatcher(object):
         return matched
 
 class Parser(object):
-    def __init__(self, scanner):
+    def __init__(self):
         self.currTokens = []
         self.patternMatcher = PatternMatcher()
         self.symTable = SymTable()
         self.irGenerator = IRGenerator()
 
+        self.scanner = None
+        self.FILE_NAME = None
+
+
+    def parse(self, scanner):
         self.scanner = scanner
         self.FILE_NAME = self.scanner.FILE_NAME
 
-
-    def parse(self):
-        #self.scanner = scanner
-
-        tokenGen = self.scanner.scan()
+        tokenGen = scanner.scan()
         currTok = next(tokenGen)
         currTok = Pattern(currTok[0],currTok[1], leaf=True)
         lookAhead = next(tokenGen)
@@ -388,7 +389,7 @@ class Parser(object):
 
 
 scanner = Scanner("test.src")
-tokens = Parser(scanner).parse()
+tokens = Parser().parse(scanner)
 
 # for tok in tokens:
     # print(tok.tokType)
