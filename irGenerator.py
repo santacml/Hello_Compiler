@@ -149,30 +149,9 @@ class IRGenerator(object):
             self.builder = self.builderRoot
 
     def bindAndRun(self):
-
-        #gcc -c -Wall -Werror -fpic foo.c
-        #gcc -shared -o libfoo.so foo.o
-        llvm.load_library_permanently("libfoo.so")
-
-
+        llvm.load_library_permanently("runtimelib.so")
 
         void = self.getType("void")
-
-        '''fnty = ir.FunctionType(void, (ir.IntType(32),))
-        func = ir.Function(self.module, fnty, name="putInteger")
-        arg = ir.Constant(ir.IntType(32), "1234")
-        self.builder.call(func, (arg,))
-
-        fnty = ir.FunctionType(void, (ir.FloatType(),))
-        func = ir.Function(self.module, fnty, name="putFloat")
-        arg = ir.Constant(ir.FloatType(), 1234.5)
-        self.builder.call(func, (arg,))
-
-        fnty = ir.FunctionType(void, (ir.IntType(1),))
-        func = ir.Function(self.module, fnty, name="putBool")
-        arg = self.getType("true")
-        self.builder.call(func, (arg,))'''
-
 
         # self.builder.ret_void()
         self.builder.ret(self.getType("true"))

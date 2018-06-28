@@ -8,6 +8,8 @@ void foo( int val)
 /*
 this is how it should be
 but alas, making args as pointers doesn't work with llvmlite for some reason
+note: it does, I just need to use PointerType. stupid past me. oh well.
+
 void foo( int *val)
 {
     printf("The integer is %d\n",  *val);

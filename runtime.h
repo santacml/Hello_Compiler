@@ -1,7 +1,7 @@
-#ifndef foo_h__
-#define foo_h__
-//gcc -c -Wall -Werror -fpic foo.c
-//gcc -shared -o libfoo.so foo.o
+#ifndef runtime_h__
+#define runtime_h__
+//gcc -c -Wall -Werror -fpic runtime.c
+//gcc -shared -o runtimelib.so runtime.o
 
 extern void foo( int val);
 
@@ -23,4 +23,4 @@ putString(string val in)
 putChar(char val in)
 */
 
-#endif  // foo_h__
+#endif  // runtime_h__
