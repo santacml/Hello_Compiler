@@ -3,10 +3,10 @@ from llvmlite import ir
 from ctypes import *
 import llvmlite.binding as llvm
 
-from typeCheck import TypeCheckError
+from typeCheck import TypeCheckError, SymTableItem
 
 class IRGenerator(object):
-    def __init__(self, filename="test.asm"):
+    def __init__(self, filename="test.asm", symTable=None):
         # filename should be proc name
         self.module = ir.Module(name=filename)
         # void = self.getType("void")
@@ -63,6 +63,75 @@ class IRGenerator(object):
 
         '''
 
+        #'''
+        self.symTable = symTable
+        self.loadDefaults()
+
+    def loadDefaults(self):
+        void = self.getType("void")
+        fnty = ir.FunctionType(void, (ir.IntType(32),))
+        func = ir.Function(self.module, fnty, name="foo")
+        arg = SymTableItem("integer", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("foo", item)
+
+        void = self.getType("void")
+        fnty = ir.FunctionType(void, (ir.IntType(1),))
+        func = ir.Function(self.module, fnty, name="putBool")
+        arg = SymTableItem("bool", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("putbool", item)
+
+        void = self.getType("void")
+        fnty = ir.FunctionType(void, (ir.IntType(32),))
+        func = ir.Function(self.module, fnty, name="putInteger")
+        arg = SymTableItem("integer", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("putinteger", item)
+
+        void = self.getType("void")
+        fnty = ir.FunctionType(void, (ir.FloatType(),))
+        func = ir.Function(self.module, fnty, name="putFloat")
+        arg = SymTableItem("float", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("putfloat", item)
+
+        void = self.getType("void")
+        ptr = ir.PointerType(self.getType("string"))
+        fnty = ir.FunctionType(void, (ptr,))
+        func = ir.Function(self.module, fnty, name="putString")
+        arg = SymTableItem("string", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("putstring", item)
+
+        void = self.getType("void")
+        fnty = ir.FunctionType(void, (self.getType("char"),))
+        func = ir.Function(self.module, fnty, name="putChar")
+        arg = SymTableItem("char", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("putchar", item)
+
+        self.defaults = ["foo",
+                         "getbool",
+                         "getinteger",
+                         "getfloat",
+                         "getstring",
+                         "getchar",
+                         "putbool",
+                         "putinteger",
+                         "putfloat",
+                         "putstring",
+                         "putchar"]
+        #class SymTableItem(object):
+        #    def __init__(self, valType, arraySize, arrayStart, params=None, paramVal=None):
+        #'''
+
     def enterProc(self, func):
         block = func.append_basic_block()
         newBuilder = ir.IRBuilder(block)
@@ -85,10 +154,25 @@ class IRGenerator(object):
         #gcc -shared -o libfoo.so foo.o
         llvm.load_library_permanently("libfoo.so")
 
+
+
         void = self.getType("void")
-        fnty = ir.FunctionType(void, tuple())
-        func = ir.Function(self.module, fnty, name="foo")
-        self.builder.call(func, tuple())
+
+        '''fnty = ir.FunctionType(void, (ir.IntType(32),))
+        func = ir.Function(self.module, fnty, name="putInteger")
+        arg = ir.Constant(ir.IntType(32), "1234")
+        self.builder.call(func, (arg,))
+
+        fnty = ir.FunctionType(void, (ir.FloatType(),))
+        func = ir.Function(self.module, fnty, name="putFloat")
+        arg = ir.Constant(ir.FloatType(), 1234.5)
+        self.builder.call(func, (arg,))
+
+        fnty = ir.FunctionType(void, (ir.IntType(1),))
+        func = ir.Function(self.module, fnty, name="putBool")
+        arg = self.getType("true")
+        self.builder.call(func, (arg,))'''
+
 
         # self.builder.ret_void()
         self.builder.ret(self.getType("true"))
@@ -137,7 +221,7 @@ class IRGenerator(object):
         # Run the function via ctypes
         cfunc = CFUNCTYPE(c_bool)(func_ptr)
         res = cfunc()
-        print("fpadd(...) =", res)
+        print("Exit: ", res)
 
     def getIR(self):
         print(repr(self.module))
@@ -146,21 +230,31 @@ class IRGenerator(object):
     def getType(self, typeStr, arr=False, arrSize=0, arrStart=0):
         if arr:
             return ir.ArrayType(self.getType(typeStr), arrSize)
+
         elif typeStr == "integer":
             return ir.IntType(32)
         elif typeStr == "bool":
             return ir.IntType(1)
+
         elif typeStr == "true":
             return ir.Constant(ir.IntType(1), "1")
+
         elif typeStr == "false":
             return ir.Constant(ir.IntType(1), "0")
+
+        elif typeStr == "string":
+            byte = ir.IntType(8)
+            array = ir.ArrayType(byte, 256)
+            return array
+        elif typeStr == "char":
+            byte = ir.IntType(8)
+            #array = ir.ArrayType(byte, 256)
+            return byte
 
 
         return  {
             "float": ir.FloatType,
             "void": ir.VoidType,
-            "char": ir.Constant,
-            "string": ir.Constant,
         }[typeStr]()
 
     def getTypeConversion(self, type1, type2):
@@ -183,22 +277,22 @@ class IRGenerator(object):
         # self.builder.branch(self.loopStack[-1])
         self.builder.position_at_end(self.loopStack[-1])
 
-    def addIR(self, pattern, symTable):
+    def addIR(self, pattern):
         # todo
             # in typecheck assignment, check if in.out.inout
             # should be done, in's are handled in typecheck, out and inout are declared beforehand?
             # handle strings and chars... and arrays.. and type checking/conversions
                 # what else do i need to do? too many things...
             # if stmt with return inside
+            # puInteger and etc
 
         # in if stmt, make it necessary for there to be at least 1 stmt!!!!!!!!!!!!!
-            # wat
-            # why
 
         # EVERYTHING ABOUT ARRAYS
             # loading a value requires int...
 
-        # puInteger and etc
+
+        # limit char length to only 1 !!!! somewhere...
 
         # and main enemy: err handling
         # is this really still an issue?
@@ -235,10 +329,33 @@ class IRGenerator(object):
                     typ = self.getType(child.resultType)
                     # constant
                     pattern.irHandle = typ
-                else:
-                    # string, char just type decl
-                    print("fill this in :(")
-                    pass
+                elif child.tokType == "string_val": # tokType is not sanitize, resultType is
+                    typ = self.getType("string") # i am fed up with this, whatever
+                    const = pattern.grabLeafValue(0)
+                    const = const[1:-1] # chop off quotes
+
+                    # all strings are exactly 256 len I guess
+                    if len(const) > 256:
+                        raise TypeCheckError("Strings may only be 256 characters long.")
+                    else:
+                        null = "\0" + "0" * (255-len(const))
+                        const = const + null
+
+                    const = bytearray(const.encode()) # convert to bytearray
+                    #const = [ord(char) for char in const]
+                    pattern.irHandle = ir.Constant(typ, const)
+
+                elif child.tokType == "char_val":
+                    typ = self.getType("char")
+                    const = pattern.grabLeafValue(0)
+                    const = const[1:-1] # chop off quotes
+
+                    # ord() gives decimal value for ascii
+                    # NO idea why this works
+                    # just take it man
+                    const = ord(const)
+                    pattern.irHandle = ir.Constant(typ, const)
+
             elif numChildren == 2:
                 # minus something
                 #rhs should have ir handle?
@@ -249,7 +366,8 @@ class IRGenerator(object):
                     pattern.irHandle = self.builder.neg(child.irHandle)
 
             else:
-                pattern.resultHandle = pattern.children[1].irHandle
+                print("Is this tested?")
+                pattern.irHandle = pattern.children[1].irHandle
                 # should be handled in expression
 
         elif tokType == "number":
@@ -257,16 +375,21 @@ class IRGenerator(object):
             const = pattern.grabLeafValue(0)
             typ = self.getType(pattern.resultType)
 
+            # floatType doesn't like float strings
+            # look into this future michael
+            # maybe contribute to llvmlite
             pattern.irHandle = ir.Constant(typ, const)
+            if pattern.resultType == "float":
+                pattern.irHandle = ir.Constant(typ, float(const))
 
         elif tokType == "name":
             name = pattern.grabLeafValue(0)
 
-            if name in symTable:
+            if name in self.symTable:
                 # set it to the pointer for i.e. name + 4
 
                 # loads this value even for like assignments... ohwell
-                # print(symTable[name])
+                # print(self.symTable[name])
                 if pattern.arrayExprIRHandle:
                     #TODO future michael
                     # cant figure out how to dynamically use llvm in array
@@ -275,15 +398,15 @@ class IRGenerator(object):
 
                     # loc = pattern.grabLeafValue(2) #this is not how it should work
                     # offset =  - pattern.arrayStart + int(loc)
-                    # val = self.builder.load(symTable[name].irPtr, align=offset)
+                    # val = self.builder.load(self.symTable[name].irPtr, align=offset)
 
                     loc =  pattern.arrayExprIRHandle
                     loc = self.builder.add(loc, ir.Constant(ir.IntType(32), str(- pattern.arrayStart)))
 
-                    ptr = self.builder.load(symTable[name].irPtr)
+                    ptr = self.builder.load(self.symTable[name].irPtr)
                     val = self.builder.extract_value(ptr, loc)
                 else:
-                    val = self.builder.load(symTable[name].irPtr)
+                    val = self.builder.load(self.symTable[name].irPtr)
 
                 # print(name, val)
                 pattern.irHandle = val
@@ -487,7 +610,7 @@ class IRGenerator(object):
                 self.enterLoop()
 
                 name = pattern.children[1].grabLeafValue(0)
-                ptr = symTable[name].irPtr
+                ptr = self.symTable[name].irPtr
 
                 val = self.builder.load(ptr)
                 result = self.builder.add(val, ir.Constant(ir.IntType(32), "1")) # just add 1 to variable
@@ -517,8 +640,8 @@ class IRGenerator(object):
             # all arguments to a function come in as ptrs to maintain in/out/inout
             for argPattern in argsToAdd:
                 name = argPattern.grabLeafValue(0)
-                if name in symTable:
-                    pattern.irHandleList.append(symTable[name].irPtr)
+                if name in self.symTable:
+                    pattern.irHandleList.append(self.symTable[name].irPtr)
                 else:
                     # turn a constant into a ptr to the constant
                     handle = pattern.children[2].irHandle
@@ -566,7 +689,7 @@ class IRGenerator(object):
                 irHandleList = []
                 for paramPattern in pattern.myList:
                     # child = pattern.children[0]
-                    symItem = symTable[paramPattern.name]
+                    symItem = self.symTable[paramPattern.name]
                     typ = None
                     if symItem.arrayType:
                         typ = self.getType(symItem.valType, symItem.arraySize) #HOW TO DO OFFSET???
@@ -580,7 +703,7 @@ class IRGenerator(object):
 
                     # include name of variable somehow? not really important? IDK
                     # irHandleList.append(self.builder.alloca(typ, name=paramPattern.name))
-                    # print(symTable[paramPattern.name])
+                    # print(self.symTable[paramPattern.name])
                     irHandleList.append(ir.PointerType(typ))
 
 
@@ -591,9 +714,9 @@ class IRGenerator(object):
 
                 funcArgs = func.args
                 for i in range(0, len(pattern.myList)):
-                    symTable[pattern.myList[i].name].irPtr = func.args[i]
+                    self.symTable[pattern.myList[i].name].irPtr = func.args[i]
 
-            symTable[procName].irPtr = func
+            self.symTable[procName].irPtr = func
             self.enterProc(func)
 
         elif tokType == "procedure_call":
@@ -602,9 +725,9 @@ class IRGenerator(object):
 
             if pattern.children[2].tokType == "expression":
                 name = pattern.grabLeafValue(2)
-                if name in symTable:
+                if name in self.symTable:
                     # this is a variable, not a constant!!
-                    argList.append(symTable[name].irPtr)
+                    argList.append(self.symTable[name].irPtr)
                 else:
                     # argList.append(pattern.children[2].irHandle)
                     # turn a constant into a stored variable. gross :( but necessary
@@ -622,7 +745,17 @@ class IRGenerator(object):
             # for arg in argList:
                 # arg =
                 # ptrList.append( ir.PointerType(arg))
-            pattern.irHandle = self.builder.call(symTable[procName].irPtr, argList)
+            if procName in self.defaults and len(argList) == 1 and procName != "putstring":
+                argList[0] = self.builder.load(argList[0])
+                #print(argList)
+                # for default functions e.g. putInteger()
+                # arguments come in as pointers
+                # this results in a type mismatch
+                # even when I make the C function argument a pointers
+                # therefore, I need to dereference for these functions
+                # and write C functions as NOT taking pointers
+
+            pattern.irHandle = self.builder.call(self.symTable[procName].irPtr, argList)
 
         elif tokType == "declaration":
             loc = 0
@@ -630,7 +763,7 @@ class IRGenerator(object):
                 loc = 1
 
             child = pattern.children[loc]
-            symItem = symTable[child.name]
+            symItem = self.symTable[child.name]
 
             if pattern.children[loc].tokType == "procedure_declaration":
                 self.builder.ret_void()
@@ -673,7 +806,7 @@ class IRGenerator(object):
             result = pattern.children[2].irHandle
 
             name = pattern.grabLeafValue(0)
-            item = symTable[name]
+            item = self.symTable[name]
             if item.arraySize != pattern.children[2].arraySize:
                 raise TypeCheckError("Tried to assign array to array of different size")
 
@@ -683,7 +816,7 @@ class IRGenerator(object):
 
             name = pattern.grabLeafValue(0)
 
-            ptr = symTable[name].irPtr
+            ptr = self.symTable[name].irPtr
 
             self.builder.store(result, ptr)
 

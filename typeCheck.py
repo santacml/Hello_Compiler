@@ -124,12 +124,25 @@ def typeCheck(pattern, LINE_NUMBER, symTable):
 
     # all of these are the same for numChildren == 1 case
     # just assign resultType as the encapsulated item's resultType
-    if tokType in ["factor", "term", "relation", "arithOp", "expression", "number"] and numChildren == 1:
+    if tokType in ["string_val", "char_val", "factor", "term", "relation", "arithOp", "expression", "number"] and numChildren == 1:
         pattern.resultType = pattern.children[0].resultType
 
-        # need the _number for parsing purposes, but from here on, chop it
+        # need the _number or _val for parsing purposes, but from here on, chop it
         if pattern.resultType == "float_number": pattern.resultType = "float"
         if pattern.resultType == "integer_number": pattern.resultType = "integer"
+
+
+        if pattern.resultType == "string_val":
+            pattern.resultType = "string"
+            string = pattern.grabLeafValue(0)
+            if len(string) > 258: # 258 for quotes ""
+                raise TypeCheckError("Strings may only be up to 256 characters long.")
+
+        if pattern.resultType == "char_val":
+            pattern.resultType = "char"
+            char = pattern.grabLeafValue(0)
+            if len(char) > 3: # 3 for quotes on either side ''
+                raise TypeCheckError("Characters may only be length 1.")
 
         if pattern.resultType in bools: pattern.resultType = "bool"
 

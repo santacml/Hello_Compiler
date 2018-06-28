@@ -74,8 +74,8 @@ class PatternMatcher(object):
             ("name",): "factor",
             ("minus", "number"): "factor",
             ("number",): "factor",
-            ("string",): "factor",
-            ("char",): "factor",
+            ("string_val",): "factor",
+            ("char_val",): "factor",
             ("true",): "factor",
             ("false",): "factor",
 
@@ -274,7 +274,7 @@ class Parser(object):
         self.currTokens = []
         self.patternMatcher = PatternMatcher()
         self.symTable = SymTable()
-        self.irGenerator = IRGenerator()
+        self.irGenerator = IRGenerator(symTable=self.symTable)
 
         self.scanner = scanner
         self.FILE_NAME = self.scanner.FILE_NAME
@@ -301,6 +301,8 @@ class Parser(object):
                 currTok = lookAhead
 
             lookAhead = next(tokenGen) if lookAhead is not None else None # now THAT's python
+
+            #print(lookAhead)
 
         # print(self.currTokens)
         # print(tuple(tok[0] for tok in self.currTokens))
@@ -358,7 +360,8 @@ class Parser(object):
                 newToken = Pattern(matched, self.currTokens[n:])
                 typeCheck(newToken, self.scanner.LINE_NUMBER, self.symTable)
 
-                self.irGenerator.addIR(newToken, self.symTable) #UNCOMMENT ME
+                #self.irGenerator.addIR(newToken, self.symTable) #UNCOMMENT ME
+                self.irGenerator.addIR(newToken)
 
                 # I guess here I'm supposed to actually DO something with the matched tokens
                 # instead of storing them

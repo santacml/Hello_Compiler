@@ -25,7 +25,7 @@ decl:   global
 
 reserved words:
 ("if", "then", "else", "end", "for", "not", "true", "false", "integer", "float", "bool",
- "char", "procedure", "in", "out", "inout", "begin", "program", "is", "global")
+ "string", "char", "procedure", "in", "out", "inout", "begin", "program", "is", "global")
 '''
 class ScanError(Exception): pass
 
@@ -81,7 +81,7 @@ class Identifier(StateMachine):
             self.states[num] = self
 
         self.keywords = ("if", "then", "else", "end", "for", "not", "true", "false",
-                         "integer", "float", "bool", "char", "procedure", "in", "out", "inout",
+                         "integer", "float", "bool", "char", "string", "procedure", "in", "out", "inout",
                          "begin", "program", "is", "global",
                          "return")
 
@@ -129,7 +129,7 @@ class End(StateMachine):
 class String(StateMachine):
     def __init__(self):
         # DOES NOT ALLOW UNDERSCORE... ???
-        StateMachine.__init__(self, "string")
+        StateMachine.__init__(self, "string_val")
         self.states = {
             " ": self,
             ",": self,
@@ -149,7 +149,7 @@ class String(StateMachine):
 
 class Char(StateMachine):
     def __init__(self):
-        StateMachine.__init__(self, "char")
+        StateMachine.__init__(self, "char_val")
         self.states = {
             "\'": End(self.name)
         }
