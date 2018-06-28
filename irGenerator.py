@@ -81,6 +81,15 @@ class IRGenerator(object):
 
     def bindAndRun(self):
 
+        #gcc -c -Wall -Werror -fpic foo.c
+        #gcc -shared -o libfoo.so foo.o
+        llvm.load_library_permanently("libfoo.so")
+
+        void = self.getType("void")
+        fnty = ir.FunctionType(void, tuple())
+        func = ir.Function(self.module, fnty, name="foo")
+        self.builder.call(func, tuple())
+
         # self.builder.ret_void()
         self.builder.ret(self.getType("true"))
         print(self.builder.basic_block)
