@@ -3,6 +3,9 @@ from hc_parser import Parser
 from hc_typeCheck import TypeChecker
 from hc_irGenerator import IRGenerator
 
+import sys
+import os
+
 class Compiler(object):
     def __init__(self, file):
         self.file = file
@@ -24,5 +27,13 @@ class Compiler(object):
 
 
 if __name__ == "__main__":
-    compiler = Compiler("test.src")
-    compiler.compile()
+    if len(sys.argv) == 2:
+        file = sys.argv[1]
+    else:
+        file = "test.src"
+        
+    if not os.path.exists(file):
+        print("Cannot find provided filepath (defaults to test.src if none provided)")
+    else:
+        compiler = Compiler(file)
+        compiler.compile()
