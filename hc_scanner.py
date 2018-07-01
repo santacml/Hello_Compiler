@@ -304,6 +304,12 @@ class Scanner(object):
     def __init__(self, file):
         self.FILE_NAME = file
         self.LINE_NUMBER = 0
+        
+    def getFileName(self):
+        return self.FILE_NAME
+        
+    def getLineNumber(self):
+        return self.LINE_NUMBER
 
     def scan(self):
         with open(self.FILE_NAME, 'rb') as f:

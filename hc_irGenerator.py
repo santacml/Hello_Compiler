@@ -3,24 +3,17 @@ from llvmlite import ir
 from ctypes import *
 import llvmlite.binding as llvm
 
-from typeCheck import TypeCheckError, SymTableItem
+from hc_typeCheck import TypeCheckError, SymTableItem
 
 class IRGenerator(object):
-    def __init__(self, filename="test.asm", symTable=None):
+    def __init__(self, scanner, parser):
         # filename should be proc name
-        self.module = ir.Module(name=filename)
-        # void = self.getType("void")
-        # fnty = ir.FunctionType(void, tuple())
-        # func = ir.Function(self.module, fnty, name="main")
-
+        self.module = ir.Module(name=scanner.getFileName())
+        
         void = self.getType("bool")
         fnty = ir.FunctionType(void, tuple())
         func = ir.Function(self.module, fnty, name="main")
-
-
-        # self.block = None
-        # self.builder = None
-
+        
         # do this when main pgm found
         block = func.append_basic_block()
         self.builderRoot = ir.IRBuilder(block)
@@ -39,32 +32,7 @@ class IRGenerator(object):
 
         self.loopStack = []
 
-        '''
-        # Create some useful types
-        double = ir.DoubleType()
-        fnty = ir.FunctionType(double, (double, double))
-
-        # Create an empty module...
-        module = ir.Module(name=__file__)
-        # and declare a function named "fpadd" inside it
-        func = ir.Function(module, fnty, name="fpadd")
-
-        # Now implement the function
-        block = func.append_basic_block(name="entry")
-        builder = ir.IRBuilder(block)
-        a, b = func.args
-        result = builder.fadd(a, b, name="res")
-        builder.ret(result)
-
-        # Print the module IR
-
-        out = repr(module)
-        print(out)
-
-        '''
-
-        #'''
-        self.symTable = symTable
+        self.symTable = parser.symTable
         self.loadDefaults()
 
     def loadDefaults(self):
@@ -149,7 +117,7 @@ class IRGenerator(object):
             self.builder = self.builderRoot
 
     def bindAndRun(self):
-        llvm.load_library_permanently("runtimelib.so")
+        # llvm.load_library_permanently(r"runtime\runtimelib.so")
 
         void = self.getType("void")
 
@@ -257,29 +225,27 @@ class IRGenerator(object):
         self.builder.position_at_end(self.loopStack[-1])
 
     def addIR(self, pattern):
-        # todo
+        # done
             # in typecheck assignment, check if in.out.inout
             # should be done, in's are handled in typecheck, out and inout are declared beforehand?
             # handle strings and chars... and arrays.. and type checking/conversions
                 # what else do i need to do? too many things...
             # if stmt with return inside
             # puInteger and etc
-
+            # limit char length to only 1 !!!! somewhere...
+        
+        # todo
         # in if stmt, make it necessary for there to be at least 1 stmt!!!!!!!!!!!!!
-
+        
         # EVERYTHING ABOUT ARRAYS
             # loading a value requires int...
-
-
-        # limit char length to only 1 !!!! somewhere...
-
+            # assigning 1 values vs whole array at a time...
+        
+        # debug everything 
+        
         # and main enemy: err handling
         # is this really still an issue?
 
-        # idk what these are:
-        # make functino for each toktype
-        # hashmap to functions
-        # use a decorator for things like toktype numchildren op etc
         tokType = pattern.tokType
 
 

@@ -1,6 +1,6 @@
-from scanner import Scanner
-from typeCheck import *
-from irGenerator import IRGenerator
+# from scanner import Scanner
+from hc_typeCheck import *
+from hc_irGenerator import IRGenerator
 
 class ParseError(Exception): pass
 
@@ -274,11 +274,12 @@ class Parser(object):
         self.currTokens = []
         self.patternMatcher = PatternMatcher()
         self.symTable = SymTable()
-        self.irGenerator = IRGenerator(symTable=self.symTable)
+        # self.irGenerator = IRGenerator(symTable=self.symTable)
 
         self.scanner = scanner
-        self.FILE_NAME = self.scanner.FILE_NAME
-
+    
+    def getLineNumber(self):
+        return self.scanner.getLineNumber()
 
     def parse(self):
         #self.scanner = scanner
@@ -293,7 +294,9 @@ class Parser(object):
             self.currTokens.append(currTok)
 
             # reduce
-            self.reduce(lookAhead)
+            # continuously yield the next token
+            for tok in self.reduce(lookAhead):
+                yield tok
 
             if lookAhead:
                 currTok = Pattern(lookAhead[0], lookAhead[1], leaf=True)
@@ -320,8 +323,8 @@ class Parser(object):
             raise ParseError("Error parsing, could not figure out where.")
 
 
-        self.irGenerator.bindAndRun()
-        return self.currTokens
+        # self.irGenerator.bindAndRun()
+        # return self.currTokens
 
 
     def reduce(self, lookAheadTok):
@@ -358,19 +361,14 @@ class Parser(object):
                 # newToken = (matched, self.currTokens[n:],)
 
                 newToken = Pattern(matched, self.currTokens[n:])
-                typeCheck(newToken, self.scanner.LINE_NUMBER, self.symTable)
+                
+                yield newToken
+                # typeCheck(newToken, self.scanner.LINE_NUMBER, self.symTable)
+                # self.irGenerator.addIR(newToken)
 
-                #self.irGenerator.addIR(newToken, self.symTable) #UNCOMMENT ME
-                self.irGenerator.addIR(newToken)
-
-                # I guess here I'm supposed to actually DO something with the matched tokens
-                # instead of storing them
-                # something something type checking something something code gen
 
                 # print("reducing", pattern, "to", newToken.tokType)  # very important for debug
-
-
-
+                
                 self.currTokens = self.currTokens[:n]
                 self.currTokens.append(newToken)
                 reduced = True
@@ -390,8 +388,8 @@ class Parser(object):
             # if it was then err
 
 
-scanner = Scanner("test.src")
-tokens = Parser(scanner).parse()
+# scanner = Scanner("test.src")
+# tokens = Parser(scanner).parse()
 
 # for tok in tokens:
     # print(tok.tokType)
