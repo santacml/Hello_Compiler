@@ -11,6 +11,7 @@ gcc -shared -o runtimelib.so runtime.o
 Next, Python will need to be installed as well as the library LLVMLite. Install Python, then using Pip (or Conda):
 
 pip install llvmlite
+
 conda install llvmlite
 
 Now the compiler is ready to use. Call using:
