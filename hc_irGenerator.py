@@ -37,7 +37,7 @@ class IRGenerator(object):
 
     def loadDefaults(self):
         void = self.getType("void")
-        fnty = ir.FunctionType(void, (ir.IntType(32),))
+        fnty = ir.FunctionType(void, (ir.PointerType(ir.IntType(32)),))
         func = ir.Function(self.module, fnty, name="foo")
         arg = SymTableItem("integer", 0, 0)
         item  = SymTableItem("procedure", 0, 0, (arg,))
@@ -46,7 +46,7 @@ class IRGenerator(object):
         self.symTable.promote("foo")
 
         void = self.getType("void")
-        fnty = ir.FunctionType(void, (ir.IntType(1),))
+        fnty = ir.FunctionType(void, (ir.PointerType(ir.IntType(32)),))
         func = ir.Function(self.module, fnty, name="putBool")
         arg = SymTableItem("bool", 0, 0)
         item  = SymTableItem("procedure", 0, 0, (arg,))
@@ -55,7 +55,7 @@ class IRGenerator(object):
         self.symTable.promote("putbool")
 
         void = self.getType("void")
-        fnty = ir.FunctionType(void, (ir.IntType(32),))
+        fnty = ir.FunctionType(void, (ir.PointerType(ir.IntType(32)),))
         func = ir.Function(self.module, fnty, name="putInteger")
         arg = SymTableItem("integer", 0, 0)
         item  = SymTableItem("procedure", 0, 0, (arg,))
@@ -64,7 +64,7 @@ class IRGenerator(object):
         self.symTable.promote("putinteger")
 
         void = self.getType("void")
-        fnty = ir.FunctionType(void, (ir.FloatType(),))
+        fnty = ir.FunctionType(void, (ir.PointerType(ir.FloatType()),))
         func = ir.Function(self.module, fnty, name="putFloat")
         arg = SymTableItem("float", 0, 0)
         item  = SymTableItem("procedure", 0, 0, (arg,))
@@ -241,21 +241,23 @@ class IRGenerator(object):
             # if stmt with return inside
             # puInteger and etc
             # limit char length to only 1 !!!! somewhere...
+            # initial array functionality
 
         # todo
         # in if stmt, make it necessary for there to be at least 1 stmt!!!!!!!!!!!!!
 
         # replace "name in symTable" with isVariable() function because of negatives, arithops, etc!!!!!!
 
-        # in llvmlite, fix instructions.py to allow arbitrary array location getting
-
         # type conversions in assignments
 
-        # globals in llvm are not globals in the language
+        # figure out how to declare globals
 
-        # EVERYTHING ABOUT ARRAYS
-            # loading a value requires int...
-            # assigning 1 values vs whole array at a time...
+        # getBool etc.... these need pointers....
+            # everything will need to use pointers....
+
+        # advanced array functionality
+            # adding 2 arrays
+            # add 1 to all elems in array
 
         # debug everything
 
@@ -347,7 +349,7 @@ class IRGenerator(object):
             name = pattern.grabLeafValue(0)
 
             if name in self.symTable:
-                
+
                 if pattern.arrayExprIRHandle:
                     loc =  pattern.arrayExprIRHandle
                     loc = self.builder.add(loc, ir.Constant(ir.IntType(32), str(- pattern.arrayStart)))
@@ -703,8 +705,8 @@ class IRGenerator(object):
             # for arg in argList:
                 # arg =
                 # ptrList.append( ir.PointerType(arg))
-            if procName in self.defaults and len(argList) == 1 and procName != "putstring":
-                argList[0] = self.builder.load(argList[0])
+            #if procName in self.defaults and len(argList) == 1 and procName != "putstring":
+            #    argList[0] = self.builder.load(argList[0])
                 #print(argList)
                 # for default functions e.g. putInteger()
                 # arguments come in as pointers

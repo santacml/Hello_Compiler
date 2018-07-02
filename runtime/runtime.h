@@ -3,13 +3,20 @@
 //gcc -c -Wall -Werror -fpic runtime.c
 //gcc -shared -o runtimelib.so runtime.o
 
-extern void foo( int val);
+extern void foo( int *val);
 
-extern void putBool( int val);
-extern void putInteger(int val)
-extern void putFloat(float val)
-extern void putString(char val[])
-extern void putChar(char val )
+extern void putBool( int *val);
+extern void putInteger(int *val);
+extern void putFloat(float *val);
+extern void putString(char *val[]);
+extern void putChar(char *val );
+
+
+extern void getBool( int *val);
+extern void getInteger(int *val);
+extern void getFloat(float *val);
+extern void getString(char *val[]);
+extern void getChar(char *val );
 /*
 getBool(bool val out)
 getInteger(integer val out)

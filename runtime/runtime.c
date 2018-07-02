@@ -1,42 +1,30 @@
 #include <stdio.h>
 
-void foo( int val)
-{
-    printf("The integer is %d\n",  val);
-}
-
-/*
-this is how it should be
-but alas, making args as pointers doesn't work with llvmlite for some reason
-note: it does, I just need to use PointerType. stupid past me. oh well.
-
 void foo( int *val)
 {
     printf("The integer is %d\n",  *val);
 }
 
-int main()
+void putBool(int *val)
 {
-    printf("Hello World");
-    int a = 123;
-    foo(&a);
-    return 0;
-}
-*/
-
-void putBool(int val)
-{
-    printf("%d\n", val);
+    if (*val)
+    {
+      printf("true");
+    }
+    else
+    {
+      printf("false");
+    }
 }
 
-void putInteger(int val)
+void putInteger(int *val)
 {
-    printf("%d\n", val);
+    printf("%d\n", *val);
 }
 
-void putFloat(float val)
+void putFloat(float *val)
 {
-    printf("%f\n", val);
+    printf("%f\n", *val);
 }
 
 void putString(char val[256])
@@ -47,4 +35,27 @@ void putString(char val[256])
 void putChar(char val)
 {
     printf("%c\n", val);
+}
+
+void getBool( int *val)
+{
+  char valStr[256];
+  fgets(valStr, 256, stdin);
+  *val = 
+}
+void getInteger(int *val)
+{
+
+}
+void getFloat(float *val)
+{
+
+}
+void getString(char *val[])
+{
+
+}
+void getChar(char *val )
+{
+
 }
