@@ -1,15 +1,30 @@
 program test_program is
     integer fibb_result;
-    string test;
     procedure fibb(integer n in, integer result out)
         integer a;
         integer b;
     begin
+        if (n < 0) then
+            result := -1;
+            return;
+        end if;
+        if (n == 0) then
+            result := 0;
+            return;
+        end if;
+        if (n == 1) then
+            result := 1;
+            return;
+        end if;
 
-        result := n+1;
+        fibb(n-1, a);
+        fibb(n-2, b);
+
+        //putInteger(b);
+        result := a + b;
     end procedure;
 begin
-    fibb_result := 1;
-    fibb(1, fibb_result);
-    //putInteger(fibb_result);
+    fibb_result := 0;
+    fibb(12, fibb_result);
+    putInteger(fibb_result);
 end program.

@@ -100,12 +100,12 @@ class TypeChecker(object):
     def __init__(self, scanner, parser):
         self.scanner = scanner
         self.parser = parser
-        
+
         self.symTable = self.parser.symTable
-            
+
     def getLineNumber(self):
         return self.parser.getLineNumber()
-    
+
     def typeCheck(self, pattern):
 
         lineErrStart = "\nError on line " + str(self.getLineNumber()) + ":\n"

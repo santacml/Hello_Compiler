@@ -9,11 +9,11 @@ class IRGenerator(object):
     def __init__(self, scanner, parser):
         # filename should be proc name
         self.module = ir.Module(name=scanner.getFileName())
-        
+
         void = self.getType("bool")
         fnty = ir.FunctionType(void, tuple())
         func = ir.Function(self.module, fnty, name="main")
-        
+
         # do this when main pgm found
         block = func.append_basic_block()
         self.builderRoot = ir.IRBuilder(block)
@@ -43,6 +43,7 @@ class IRGenerator(object):
         item  = SymTableItem("procedure", 0, 0, (arg,))
         item.irPtr = func
         self.symTable.declare("foo", item)
+        self.symTable.promote("foo")
 
         void = self.getType("void")
         fnty = ir.FunctionType(void, (ir.IntType(1),))
@@ -51,6 +52,7 @@ class IRGenerator(object):
         item  = SymTableItem("procedure", 0, 0, (arg,))
         item.irPtr = func
         self.symTable.declare("putbool", item)
+        self.symTable.promote("putbool")
 
         void = self.getType("void")
         fnty = ir.FunctionType(void, (ir.IntType(32),))
@@ -59,6 +61,7 @@ class IRGenerator(object):
         item  = SymTableItem("procedure", 0, 0, (arg,))
         item.irPtr = func
         self.symTable.declare("putinteger", item)
+        self.symTable.promote("putinteger")
 
         void = self.getType("void")
         fnty = ir.FunctionType(void, (ir.FloatType(),))
@@ -67,6 +70,7 @@ class IRGenerator(object):
         item  = SymTableItem("procedure", 0, 0, (arg,))
         item.irPtr = func
         self.symTable.declare("putfloat", item)
+        self.symTable.promote("putfloat")
 
         void = self.getType("void")
         ptr = ir.PointerType(self.getType("string"))
@@ -76,6 +80,7 @@ class IRGenerator(object):
         item  = SymTableItem("procedure", 0, 0, (arg,))
         item.irPtr = func
         self.symTable.declare("putstring", item)
+        self.symTable.promote("putstring")
 
         void = self.getType("void")
         fnty = ir.FunctionType(void, (self.getType("char"),))
@@ -84,6 +89,7 @@ class IRGenerator(object):
         item  = SymTableItem("procedure", 0, 0, (arg,))
         item.irPtr = func
         self.symTable.declare("putchar", item)
+        self.symTable.promote("putchar")
 
         self.defaults = ["foo",
                          "getbool",
@@ -117,7 +123,7 @@ class IRGenerator(object):
             self.builder = self.builderRoot
 
     def bindAndRun(self):
-        # llvm.load_library_permanently(r"runtime\runtimelib.so")
+        llvm.load_library_permanently(r"./runtime/runtimelib.so")
 
         void = self.getType("void")
 
@@ -233,16 +239,18 @@ class IRGenerator(object):
             # if stmt with return inside
             # puInteger and etc
             # limit char length to only 1 !!!! somewhere...
-        
+
         # todo
         # in if stmt, make it necessary for there to be at least 1 stmt!!!!!!!!!!!!!
-        
+
+        # replace "name in symTable" with isVariable() function because of negatives, arithops, etc!!!!!!
+
         # EVERYTHING ABOUT ARRAYS
             # loading a value requires int...
             # assigning 1 values vs whole array at a time...
-        
-        # debug everything 
-        
+
+        # debug everything
+
         # and main enemy: err handling
         # is this really still an issue?
 
@@ -415,6 +423,7 @@ class IRGenerator(object):
             if op == "+":
                 pattern.irHandle = self.builder.add(lhs, rhs)
             elif op == "-":
+                #print("ASDF",lhs, "ASD", rhs)
                 pattern.irHandle = self.builder.sub(lhs, rhs)
 
         elif tokType == "expression":
@@ -584,12 +593,14 @@ class IRGenerator(object):
 
             # all arguments to a function come in as ptrs to maintain in/out/inout
             for argPattern in argsToAdd:
+
                 name = argPattern.grabLeafValue(0)
-                if name in self.symTable:
+
+                if name in self.symTable and argPattern.isVariable():
                     pattern.irHandleList.append(self.symTable[name].irPtr)
                 else:
                     # turn a constant into a ptr to the constant
-                    handle = pattern.children[2].irHandle
+                    handle = argPattern.irHandle
                     typ = handle.type
                     ptr = self.builder.alloca(typ)
                     self.builder.store(handle, ptr)

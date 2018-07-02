@@ -45,6 +45,7 @@ class Pattern(object):
 
         token = child.tokType
 
+
         if grandParent and len(grandParent.children) == 2:
             # handle negative numbers
             possibleNeg = grandParent.children[0].children[0].tokType
@@ -57,6 +58,31 @@ class Pattern(object):
 
 
         return token
+
+    def isVariable(self):
+        result = True
+        pattern = self
+        children = self.children
+        while children:
+            numChildren = len(children)
+            if pattern.tokType in ["expression", "arithOp", "relation", "term"] :
+                if numChildren > 1:
+                    result = False
+            elif pattern.tokType == "factor":
+                if numChildren == 2:
+                    if children[1].tokType == "number":
+                        result = False
+                elif numChildren == 3:
+                    result = False
+
+            # from here only name and random crap are left
+            elif pattern.tokType != "name" and pattern.tokType != "identifier":
+                    result = False
+
+            pattern = children[0]
+            children = pattern.children
+
+        return result
 
 class PatternMatcher(object):
     def __init__(self):
@@ -277,7 +303,7 @@ class Parser(object):
         # self.irGenerator = IRGenerator(symTable=self.symTable)
 
         self.scanner = scanner
-    
+
     def getLineNumber(self):
         return self.scanner.getLineNumber()
 
@@ -361,14 +387,14 @@ class Parser(object):
                 # newToken = (matched, self.currTokens[n:],)
 
                 newToken = Pattern(matched, self.currTokens[n:])
-                
+
                 yield newToken
                 # typeCheck(newToken, self.scanner.LINE_NUMBER, self.symTable)
                 # self.irGenerator.addIR(newToken)
 
 
                 # print("reducing", pattern, "to", newToken.tokType)  # very important for debug
-                
+
                 self.currTokens = self.currTokens[:n]
                 self.currTokens.append(newToken)
                 reduced = True
