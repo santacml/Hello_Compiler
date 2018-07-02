@@ -148,7 +148,7 @@ class TypeChecker(object):
             name = pattern.children[0].children[0].resultType
 
             if not name in self.symTable:
-                # print(symTable.currScope)
+                #print(self.symTable.rootScope)
                 raise TypeCheckError(lineErrStart + "Variable or procedure name " + name + " not found.")
 
             symItem = self.symTable[name]
@@ -338,7 +338,7 @@ class TypeChecker(object):
                 self.symTable.declare(child.name, symTableItem)
 
             if len(pattern.children) == 2:
-                # make sure I write out procedure_declaration!
+                # oh, this is where it gets promoted
                 self.symTable.promote(pattern.children[1].name)
 
         elif tokType == "argument_list":

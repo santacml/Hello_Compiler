@@ -347,18 +347,26 @@ class IRGenerator(object):
             name = pattern.grabLeafValue(0)
 
             if name in self.symTable:
-                
+                # set it to the pointer for i.e. name + 4
+
+                # loads this value even for like assignments... ohwell
+                # print(self.symTable[name])
+                print
+
                 if pattern.arrayExprIRHandle:
+                    #TODO future michael
+                    # cant figure out how to dynamically use llvm in array
+                    # as in, load array[i]
+                    # as the python function requires an inteer
+
+                    # loc = pattern.grabLeafValue(2) #this is not how it should work
+                    # offset =  - pattern.arrayStart + int(loc)
+                    # val = self.builder.load(self.symTable[name].irPtr, align=offset)
+
                     loc =  pattern.arrayExprIRHandle
                     loc = self.builder.add(loc, ir.Constant(ir.IntType(32), str(- pattern.arrayStart)))
-
-                    ptr = self.symTable[name].irPtr
-
-                    zero = ir.Constant(ir.IntType(32), 0)
-                    ptrInArray = self.builder.gep(ptr, [zero, loc])
-                    #val = self.builder.extract_value(self.builder.load(ptrInArray), [0])
-
-                    val = self.builder.load(ptrInArray)
+                    arr = self.builder.load(self.symTable[name].irPtr)
+                    val = self.builder.extract_value(arr, 2)
 
                 else:
                     val = self.builder.load(self.symTable[name].irPtr)
@@ -783,18 +791,12 @@ class IRGenerator(object):
 
                     self.builder.store(result, ptr)
                 else:
+                    # TODO figure out inserting and putting into certain spots
+                    # LOOK INTO GETELEMPTR
                     loc =  tmpPattern.arrayExprIRHandle
                     loc = self.builder.add(loc, ir.Constant(ir.IntType(32), str(- pattern.arrayStart)))
-
-
-                    #newArr = self.builder.insert_value(self.builder.load(ptr), result, 2)
-                    #self.builder.store(newArr, ptr)
-
-
-                    zero = ir.Constant(ir.IntType(32), 0)
-                    ptrInArray = self.builder.gep(ptr, [zero, loc])
-
-                    self.builder.store(result, ptrInArray)
+                    newArr = self.builder.insert_value(self.builder.load(ptr), result, 2)
+                    self.builder.store(newArr, ptr)
             else:
 
                 self.builder.store(result, ptr)
