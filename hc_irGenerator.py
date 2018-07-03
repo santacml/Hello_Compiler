@@ -296,24 +296,27 @@ class IRGenerator(object):
             # initial array functionality
             # getBool etc.... these need pointers....
                 # everything will need to use pointers....
+            # advanced array functionality
+                # adding 2 arrays
+                # add 1 to all elems in array
 
         # todo
         # in if stmt, make it necessary for there to be at least 1 stmt?
-
-        # replace "name in symTable" with isVariable() function because of negatives, arithops, etc!!!!!!
-            # isVariable vs arrayExprIRHandle?
 
         # type conversions in assignments
 
         # figure out how to declare globals
 
+        # fix for loop apparently
+
         # getChar not working
 
-        # advanced array functionality
-            # adding 2 arrays
-            # add 1 to all elems in array
-
-        # debug everything
+        # clean up  anything with arrays... so gross
+            # need some global "is this array" function or thing
+            # arrayExprIRHandle seems good, I am dumb
+            # maybe even make array access different token from name
+            # as that screws everything up
+            # arithop, assignment huge if stmts
 
         # and main enemy: err handling
         # is this really still an issue?
@@ -413,7 +416,6 @@ class IRGenerator(object):
                     zero = ir.Constant(ir.IntType(32), 0)
                     ptrInArray = self.builder.gep(ptr, [zero, loc])
                     #val = self.builder.extract_value(self.builder.load(ptrInArray), [0])
-
                     val = self.builder.load(ptrInArray)
 
                 else:
@@ -433,9 +435,9 @@ class IRGenerator(object):
             rhs = pattern.children[2].irHandle
 
             if op == "/":
-                pattern.irHandle = self.builder.mul(lhs, rhs)
-            elif op == "*":
                 pattern.irHandle = self.builder.sdiv(lhs, rhs)
+            elif op == "*":
+                pattern.irHandle = self.builder.mul(lhs, rhs)
 
         elif tokType == "relation":
             # ("relation", "less", "term"): "relation",
@@ -486,24 +488,59 @@ class IRGenerator(object):
             lhsArray = False
             rhsArray = False
 
-            name = lhsPattern.grabLeafValue(0)
-            if name in self.symTable and self.symTable[name].arraySize > 0 and lhsPattern.isVariable():
+            rhsName = lhsPattern.grabLeafValue(0)
+            if rhsName in self.symTable and self.symTable[rhsName].arraySize > 0 and lhsPattern.isVariable():
                 lhsArray = True
 
-            name = rhsPattern.grabLeafValue(0)
-            if name in self.symTable and self.symTable[name].arraySize > 0 and rhsPattern.isVariable():
+            lhsName = rhsPattern.grabLeafValue(0)
+            if lhsName in self.symTable and self.symTable[lhsName].arraySize > 0 and rhsPattern.isVariable():
                 rhsArray = True
 
             if lhsArray or rhsArray:
+                irHandleList = []
+
                 if lhsArray and rhsArray:
-                    pass
+                    # adding 2 arrays
+                    lhsItem = self.symTable[lhsName]
+                    rhsItem = self.symTable[rhsName]
+
+                    if lhsItem.arraySize != rhsItem.arraySize:
+                        raise TypeCheckError("Tried to assign array to array of different size")
+
+                    lhsPtr = lhsItem.irPtr
+                    rhsPtr = rhsItem.irPtr
+
+                    for x in range(0, lhsItem.arraySize):
+                        zero = ir.Constant(ir.IntType(32), 0)
+
+                        lhsLoc = ir.Constant(ir.IntType(32), str(x-lhsItem.arrayStart))
+                        lhsPtrInArray = self.builder.gep(lhsPtr, [zero, lhsLoc])
+                        rhsLoc = ir.Constant(ir.IntType(32), str(x-rhsItem.arrayStart))
+                        rhsPtrInArray = self.builder.gep(rhsPtr, [zero, rhsLoc])
+
+                        lhsVal = self.builder.load(lhsPtrInArray)
+                        rhsVal = self.builder.load(rhsPtrInArray)
+                        if pattern.children[0].resultType != pattern.children[2].resultType:
+                            # one is float and one is int, convert both to float
+                            lhsVal = self.builder.uitofp(lhsVal, ir.FloatType)
+                            rhsVal = self.builder.uitofp(rhsVal, ir.FloatType)
+
+                        result = opFunc(lhsVal, rhsVal)
+
+                        irHandleList.append(result)
+
+
                 else:
+                    '''
+                    this is like c := c + 15
+                    '''
+
                     arrPattern, otherVal = (lhsPattern, rhsPattern) if lhsArray else (rhsPattern, lhsPattern)
                     symItem = self.symTable[arrPattern.grabLeafValue(0)]
                     ptr = symItem.irPtr
 
                     for x in range(0, symItem.arraySize):
-                        loc = ir.Constant(ir.IntType(32), str(symItem.arraySize-symItem.arrayStart))
+                        loc = ir.Constant(ir.IntType(32), str(x-symItem.arrayStart))
                         zero = ir.Constant(ir.IntType(32), 0)
                         ptrInArray = self.builder.gep(ptr, [zero, loc])
 
@@ -515,8 +552,10 @@ class IRGenerator(object):
 
                         result = opFunc(val, otherVal.irHandle)
 
-                        self.builder.store(result, ptrInArray)
+                        irHandleList.append(result)
+                        #self.builder.store(result, ptrInArray)
 
+                pattern.irHandle = irHandleList
             else:
                 # regular addition
                 if pattern.children[0].resultType != pattern.children[2].resultType:
@@ -650,9 +689,18 @@ class IRGenerator(object):
             if firstChild.tokType == "loop_open":
                 cond = pattern.children[1].irHandle
 
+                '''
+                name = pattern.children[1].grabLeafValue(0)
+                ptr = self.symTable[name].irPtr
+                val = self.builder.load(ptr)
+                result = self.builder.add(val, ir.Constant(ir.IntType(32), "-1")) # just add 1 to variable
+                self.builder.store(result, ptr)
+                '''
+
                 bb = self.builder.basic_block
                 bbloop = self.builder.append_basic_block(name=bb.name + '.loopblock')
                 bbend = self.builder.append_basic_block(name=bb.name + '.loopend')
+
 
 
                 br = self.builder.cbranch(cond, bbloop, bbend)
@@ -748,7 +796,7 @@ class IRGenerator(object):
                     symItem = self.symTable[paramPattern.name]
                     typ = None
                     if symItem.arrayType:
-                        typ = self.getType(symItem.valType, symItem.arraySize) #HOW TO DO OFFSET???
+                        typ = self.getType(symItem.valType, arr=True, arrSize=symItem.arraySize)
                     else:
                         typ = self.getType(paramPattern.resultType)
 
@@ -786,6 +834,9 @@ class IRGenerator(object):
                     # this is a variable, not a constant!!
                     argList.append(self.symTable[name].irPtr)
                 else:
+                    # NOTE: This also handles array indexing args because
+                    # they will have their irhandle set
+
                     # argList.append(pattern.children[2].irHandle)
                     # turn a constant into a stored variable. gross :( but necessary
                     handle = pattern.children[2].irHandle
@@ -867,9 +918,9 @@ class IRGenerator(object):
             result = pattern.children[2].irHandle
 
             name = pattern.grabLeafValue(0)
-            item = self.symTable[name]
+            symItem = self.symTable[name]
             ptr = self.symTable[name].irPtr
-            if item.arraySize > 0:
+            if symItem.arraySize > 0:
                 tmpPattern = pattern
                 # this may be dangerous!
                 while tmpPattern.tokType != "name":
@@ -877,11 +928,23 @@ class IRGenerator(object):
 
                 # assigning entire array at once
                 if len(tmpPattern.children) == 1:
-                    #if item.arraySize != pattern.children[2].arraySize:
-                    #    raise TypeCheckError("Tried to assign array to array of different size")
+                    # left side of assignment is only name of an array
+                    if isinstance(result, type([])):
+                        # right side is either adding 2 arrays or adding 1 val to entire array
+                        if symItem.arraySize != len(result):
+                            raise TypeCheckError("Tried to assign array to array of different size")
+
+                        for x in range(0, symItem.arraySize):
+                            loc = ir.Constant(ir.IntType(32), str(x-symItem.arrayStart))
+                            zero = ir.Constant(ir.IntType(32), 0)
+                            ptrInArray = self.builder.gep(ptr, [zero, loc])
+
+                            self.builder.store(result[x], ptrInArray)
+                    else:
+                        # right side needs to be name of equal size array
 
                     #self.builder.store(result, ptr)
-                    pass
+                        pass
                 else:
                     loc =  tmpPattern.arrayExprIRHandle
                     loc = self.builder.add(loc, ir.Constant(ir.IntType(32), str(- pattern.arrayStart)))
@@ -899,10 +962,10 @@ class IRGenerator(object):
 
                 self.builder.store(result, ptr)
 
-            if item.valType != pattern.children[2].resultType:
+            if symItem.valType != pattern.children[2].resultType:
                 # print(item.valType)
                 # TODO: future michael, incorporate type conversions!
-                typeConvert = self.getTypeConversion(item.valType, pattern.children[2].resultType)
+                typeConvert = self.getTypeConversion(symItem.valType, pattern.children[2].resultType)
 
 
 

@@ -74,10 +74,11 @@ class Pattern(object):
                         result = False
                 elif numChildren == 3:
                     result = False
-
+            elif pattern.tokType == "name" and numChildren == 4:
+                result = False
             # from here only name and random crap are left
             elif pattern.tokType != "name" and pattern.tokType != "identifier":
-                    result = False
+                result = False
 
             pattern = children[0]
             children = pattern.children

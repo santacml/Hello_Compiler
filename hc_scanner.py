@@ -3,8 +3,8 @@ import os
 '''
 tokens:
 number: [[0-9][0-9_]*[.[0-9_]*]
-string: “[a-zA-Z0-9 _,;:.']*”
-char:   '[a-zA-Z0-9 _;:.”]'
+string: "[a-zA-Z0-9 _,;:.']*"
+char:   '[a-zA-Z0-9 _;:."]'
 ident:  [a-zA-Z][a-zA-Z0-9_]*
 ifstmt: if, then, else, end if
 loop:   for, end for
@@ -304,10 +304,10 @@ class Scanner(object):
     def __init__(self, file):
         self.FILE_NAME = file
         self.LINE_NUMBER = 0
-        
+
     def getFileName(self):
         return self.FILE_NAME
-        
+
     def getLineNumber(self):
         return self.LINE_NUMBER
 

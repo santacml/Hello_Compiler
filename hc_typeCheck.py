@@ -246,7 +246,6 @@ class TypeChecker(object):
             pattern.resultType = child.resultType
             pattern.arraySize = child.arraySize
             pattern.arrayStart = child.arrayStart
-
             pattern.parameterVal =  pattern.grabLeafValue(1)
 
         elif tokType == "parameter_list":
@@ -281,7 +280,7 @@ class TypeChecker(object):
                 symTableItemList = [SymTableItem(item.resultType, item.arraySize, item.arrayStart, paramVal=item.parameterVal) for item in pattern.myList]
 
 
-            procSymTableItem = SymTableItem(pattern.resultType, 0, 0, symTableItemList)
+            procSymTableItem = SymTableItem(pattern.resultType, 0, 0, params=symTableItemList)
 
             # add params to symtable as procedure item
             self.symTable.enter(procName=pattern.name, procSymTableItem=procSymTableItem)
@@ -368,8 +367,16 @@ class TypeChecker(object):
                 else:
                     pattern.myList = pattern.children[2].myList # has an arglist
 
+            symTableItemList = []
+            for item in pattern.myList:
+                if item.grabLeafValue(0) in self.symTable and item.isVariable():
+                    symItem = self.symTable[item.grabLeafValue(0)]
+                else:
+                    symItem = SymTableItem(item.resultType, item.arraySize, item.arrayStart)
 
-            symTableItemList = [SymTableItem(item.resultType, item.arraySize, item.arrayStart) for item in pattern.myList]
+                symTableItemList.append(symItem)
+
+            #symTableItemList = [ for item in pattern.myList]
 
             procItem = self.symTable[procName] # should not fail...
             procParams = procItem.params
@@ -385,9 +392,12 @@ class TypeChecker(object):
                 arg = symTableItemList[i]
                 param = procParams[i]
 
+
                 if arg.valType != param.valType:
                     raise TypeCheckError(lineErrStart + "Argument " + str(i) + " does not match type for procedure parameter")
                 elif arg.arraySize != param.arraySize:
+                    #print(arg.arraySize)
+                    #print(param.arraySize)
                     raise TypeCheckError(lineErrStart + "Argument " + str(i) + " does not match array size for procedure parameter")
                 elif arg.arrayStart != param.arrayStart:
                     raise TypeCheckError(lineErrStart + "Argument " + str(i) + " does not match array start location for procedure parameter")
