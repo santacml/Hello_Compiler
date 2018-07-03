@@ -1,6 +1,7 @@
 program test_program is
     integer a;
     integer b[10];
+		integer c[3];
     procedure f (integer x in, integer y out)
         integer b;
     begin
@@ -8,11 +9,12 @@ program test_program is
         y := b;
     end procedure;
 begin
-
-    b[2] := 5;
-		a := b[2];
+		c[0] := 1;
+		c[1] := 2;
+		c[2] := 3;
+		c := c + 15;
+		a := c[2];
     putInteger(a);
 
-		putString("test");
 
 end program .

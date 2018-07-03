@@ -36,6 +36,26 @@ class IRGenerator(object):
         self.loadDefaults()
 
     def loadDefaults(self):
+        self.loadPutFunctions()
+        self.loadGetFunctions()
+
+
+        self.defaults = ["foo",
+                         "getbool",
+                         "getinteger",
+                         "getfloat",
+                         "getstring",
+                         "getchar",
+                         "putbool",
+                         "putinteger",
+                         "putfloat",
+                         "putstring",
+                         "putchar"]
+        #class SymTableItem(object):
+        #    def __init__(self, valType, arraySize, arrayStart, params=None, paramVal=None):
+        #'''
+
+    def loadPutFunctions(self):
         void = self.getType("void")
         fnty = ir.FunctionType(void, (ir.PointerType(ir.IntType(32)),))
         func = ir.Function(self.module, fnty, name="foo")
@@ -46,7 +66,7 @@ class IRGenerator(object):
         self.symTable.promote("foo")
 
         void = self.getType("void")
-        fnty = ir.FunctionType(void, (ir.PointerType(ir.IntType(32)),))
+        fnty = ir.FunctionType(void, (ir.PointerType(ir.IntType(1)),))
         func = ir.Function(self.module, fnty, name="putBool")
         arg = SymTableItem("bool", 0, 0)
         item  = SymTableItem("procedure", 0, 0, (arg,))
@@ -83,7 +103,7 @@ class IRGenerator(object):
         self.symTable.promote("putstring")
 
         void = self.getType("void")
-        fnty = ir.FunctionType(void, (self.getType("char"),))
+        fnty = ir.FunctionType(void, (ir.PointerType(self.getType("char")),))
         func = ir.Function(self.module, fnty, name="putChar")
         arg = SymTableItem("char", 0, 0)
         item  = SymTableItem("procedure", 0, 0, (arg,))
@@ -91,20 +111,52 @@ class IRGenerator(object):
         self.symTable.declare("putchar", item)
         self.symTable.promote("putchar")
 
-        self.defaults = ["foo",
-                         "getbool",
-                         "getinteger",
-                         "getfloat",
-                         "getstring",
-                         "getchar",
-                         "putbool",
-                         "putinteger",
-                         "putfloat",
-                         "putstring",
-                         "putchar"]
-        #class SymTableItem(object):
-        #    def __init__(self, valType, arraySize, arrayStart, params=None, paramVal=None):
-        #'''
+    def loadGetFunctions(self):
+        void = self.getType("void")
+        fnty = ir.FunctionType(void, (ir.PointerType(ir.IntType(1)),))
+        func = ir.Function(self.module, fnty, name="getBool")
+        arg = SymTableItem("bool", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("getbool", item)
+        self.symTable.promote("getbool")
+
+        void = self.getType("void")
+        fnty = ir.FunctionType(void, (ir.PointerType(ir.IntType(32)),))
+        func = ir.Function(self.module, fnty, name="getInteger")
+        arg = SymTableItem("integer", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("getinteger", item)
+        self.symTable.promote("getinteger")
+
+        void = self.getType("void")
+        fnty = ir.FunctionType(void, (ir.PointerType(ir.FloatType()),))
+        func = ir.Function(self.module, fnty, name="getFloat")
+        arg = SymTableItem("float", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("getfloat", item)
+        self.symTable.promote("getfloat")
+
+        void = self.getType("void")
+        ptr = ir.PointerType(self.getType("string"))
+        fnty = ir.FunctionType(void, (ptr,))
+        func = ir.Function(self.module, fnty, name="getString")
+        arg = SymTableItem("string", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("getstring", item)
+        self.symTable.promote("getstring")
+
+        void = self.getType("void")
+        fnty = ir.FunctionType(void, (ir.PointerType(self.getType("char")),))
+        func = ir.Function(self.module, fnty, name="getChar")
+        arg = SymTableItem("char", 0, 0)
+        item  = SymTableItem("procedure", 0, 0, (arg,))
+        item.irPtr = func
+        self.symTable.declare("getchar", item)
+        self.symTable.promote("getchar")
 
     def enterProc(self, func):
         block = func.append_basic_block()
@@ -242,18 +294,20 @@ class IRGenerator(object):
             # puInteger and etc
             # limit char length to only 1 !!!! somewhere...
             # initial array functionality
+            # getBool etc.... these need pointers....
+                # everything will need to use pointers....
 
         # todo
-        # in if stmt, make it necessary for there to be at least 1 stmt!!!!!!!!!!!!!
+        # in if stmt, make it necessary for there to be at least 1 stmt?
 
         # replace "name in symTable" with isVariable() function because of negatives, arithops, etc!!!!!!
+            # isVariable vs arrayExprIRHandle?
 
         # type conversions in assignments
 
         # figure out how to declare globals
 
-        # getBool etc.... these need pointers....
-            # everything will need to use pointers....
+        # getChar not working
 
         # advanced array functionality
             # adding 2 arrays
@@ -413,22 +467,64 @@ class IRGenerator(object):
             # ("arithOp", "minus", "name"): "arithOp",   # but this fixes it? I guess?
             # ("relation",): "arithOp",
 
-            # if numChildren > 1: # covered
 
             op = pattern.grabLeafValue(1)
-            lhs = pattern.children[0].irHandle
-            rhs = pattern.children[2].irHandle
-
-            if pattern.children[0].resultType != pattern.children[2].resultType:
-                # one is float and one is int, convert both to float
-                lhs = self.builder.uitofp(lhs, ir.FloatType)
-                rhs = self.builder.uitofp(rhs, ir.FloatType)
-
+            opFunc = None
             if op == "+":
-                pattern.irHandle = self.builder.add(lhs, rhs)
+                #pattern.irHandle = self.builder.add(lhs, rhs)
+                opFunc = self.builder.add
             elif op == "-":
                 #print("ASDF",lhs, "ASD", rhs)
-                pattern.irHandle = self.builder.sub(lhs, rhs)
+                #pattern.irHandle = self.builder.sub(lhs, rhs)
+                opFunc = self.builder.sub
+
+            lhsPattern = pattern.children[0]
+            rhsPattern = pattern.children[2]
+            lhs = lhsPattern.irHandle
+            rhs = rhsPattern.irHandle
+
+            lhsArray = False
+            rhsArray = False
+
+            name = lhsPattern.grabLeafValue(0)
+            if name in self.symTable and self.symTable[name].arraySize > 0 and lhsPattern.isVariable():
+                lhsArray = True
+
+            name = rhsPattern.grabLeafValue(0)
+            if name in self.symTable and self.symTable[name].arraySize > 0 and rhsPattern.isVariable():
+                rhsArray = True
+
+            if lhsArray or rhsArray:
+                if lhsArray and rhsArray:
+                    pass
+                else:
+                    arrPattern, otherVal = (lhsPattern, rhsPattern) if lhsArray else (rhsPattern, lhsPattern)
+                    symItem = self.symTable[arrPattern.grabLeafValue(0)]
+                    ptr = symItem.irPtr
+
+                    for x in range(0, symItem.arraySize):
+                        loc = ir.Constant(ir.IntType(32), str(symItem.arraySize-symItem.arrayStart))
+                        zero = ir.Constant(ir.IntType(32), 0)
+                        ptrInArray = self.builder.gep(ptr, [zero, loc])
+
+                        val = self.builder.load(ptrInArray)
+                        if pattern.children[0].resultType != pattern.children[2].resultType:
+                            # one is float and one is int, convert both to float
+                            val = self.builder.uitofp(val, ir.FloatType)
+                            otherVal = self.builder.uitofp(otherVal, ir.FloatType)
+
+                        result = opFunc(val, otherVal.irHandle)
+
+                        self.builder.store(result, ptrInArray)
+
+            else:
+                # regular addition
+                if pattern.children[0].resultType != pattern.children[2].resultType:
+                    # one is float and one is int, convert both to float
+                    lhs = self.builder.uitofp(lhs, ir.FloatType)
+                    rhs = self.builder.uitofp(rhs, ir.FloatType)
+
+                pattern.irHandle = opFunc(lhs, rhs)
 
         elif tokType == "expression":
             # ("expression", "and", "arithOp"): "expression",
@@ -685,7 +781,8 @@ class IRGenerator(object):
 
             if pattern.children[2].tokType == "expression":
                 name = pattern.grabLeafValue(2)
-                if name in self.symTable:
+                if name in self.symTable and pattern.children[2].isVariable():
+                    #print(name, pattern.children[2].isVariable())
                     # this is a variable, not a constant!!
                     argList.append(self.symTable[name].irPtr)
                 else:
@@ -780,10 +877,11 @@ class IRGenerator(object):
 
                 # assigning entire array at once
                 if len(tmpPattern.children) == 1:
-                    if item.arraySize != pattern.children[2].arraySize:
-                        raise TypeCheckError("Tried to assign array to array of different size")
+                    #if item.arraySize != pattern.children[2].arraySize:
+                    #    raise TypeCheckError("Tried to assign array to array of different size")
 
-                    self.builder.store(result, ptr)
+                    #self.builder.store(result, ptr)
+                    pass
                 else:
                     loc =  tmpPattern.arrayExprIRHandle
                     loc = self.builder.add(loc, ir.Constant(ir.IntType(32), str(- pattern.arrayStart)))
