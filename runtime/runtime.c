@@ -34,9 +34,9 @@ void putString(char val[256])
     printf("%s\n",val);
 }
 
-void putChar(char val)
+void putChar(char *val)
 {
-    printf("%c\n", val);
+    printf("%s\n", val);
 }
 
 void getBool( int *val)

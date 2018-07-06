@@ -1,6 +1,6 @@
 # from scanner import Scanner
 from hc_typeCheck import *
-from hc_irGenerator import IRGenerator
+#from hc_irGenerator import IRGenerator
 
 class ParseError(Exception): pass
 
@@ -141,7 +141,7 @@ class PatternMatcher(object):
 
             ("name", "assignment", "expression"): "assignment_stmt",
 
-            ("for", "lparen","assignment_stmt", "semic"): "loop_open",
+            ("for", "lparen","name", "assignment", "expression", "semic"): "loop_open",
             ("loop_open", "expression", "rparen"): "loop_start",
             ("loop_start", "statement", "semic",): "loop_start",
             # ("end", "for",): "loop_end",
@@ -248,6 +248,7 @@ class PatternMatcher(object):
             ("expression", "comma",): "__shift__",
 
 
+            ("for", "lparen","name", "assignment", "expression", "semic",): "__shift__",
             # ("loop_open", "assignment_stmt", "semic",): "__shift__", # prevent assignments getting sucked up
             ("for", "lparen", "assignment_stmt", "semic",): "__shift__", # prevent assignments getting sucked up
             # ("for", "lparen", "assignment_stmt", "semic", "statement", "rparen"): "__shift__", # prevent statement getting sucked up
@@ -305,6 +306,8 @@ class Parser(object):
 
         self.scanner = scanner
 
+        self.lastSuccessfulReduceLine = 0
+
     def getLineNumber(self):
         return self.scanner.getLineNumber()
 
@@ -347,7 +350,7 @@ class Parser(object):
             # print(endTokTypes[badLoc])
             print(endTokTypes)
             # this sucks ass.......
-            raise ParseError("Error parsing, could not figure out where.")
+            raise ParseError("Undefined parsing error on line:", self.lastSuccessfulReduceLine)
 
 
         # self.irGenerator.bindAndRun()
@@ -365,6 +368,7 @@ class Parser(object):
             if reduced:
                 reduced = False
                 onceReduced = True
+                self.lastSuccessfulReduceLine  = self.scanner.LINE_NUMBER
 
             # for n in range(len(self.currTokens)-1, -1,-1):
             for n in range(0,len(self.currTokens)):

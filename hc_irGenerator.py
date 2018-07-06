@@ -4,6 +4,7 @@ from ctypes import *
 import llvmlite.binding as llvm
 
 from hc_typeCheck import TypeCheckError, SymTableItem
+from hc_parser import Pattern
 
 class IRGenerator(object):
     def __init__(self, scanner, parser):
@@ -175,19 +176,22 @@ class IRGenerator(object):
             self.builder = self.builderRoot
 
     def bindAndRun(self):
+        print("Binding to LLVM and running. Here is the LLVM to be run:")
         llvm.load_library_permanently(r"./runtime/runtimelib.so")
 
         void = self.getType("void")
 
         # self.builder.ret_void()
         self.builder.ret(self.getType("true"))
-        print(self.builder.basic_block)
+        #print(self.builder.basic_block)
 
         llvm.initialize()
         llvm.initialize_native_target()
         llvm.initialize_native_asmprinter()  # yes, even this one
 
         llvm_ir = self.getIR()
+
+        print("------------------Output-----------------------")
 
         def create_execution_engine():
             """
@@ -299,17 +303,26 @@ class IRGenerator(object):
             # advanced array functionality
                 # adding 2 arrays
                 # add 1 to all elems in array
+            # fix for loop apparently
+            # make for loop actually do the arithOp
+            # do "error on line" according to last reduce!
+            # in if stmt, make it necessary for there to be at least 1 stmt?
+                # results in parsing error, that's fine
+                # could make more robust by detecting "if", "lparen" "rparen"
+                # oh well
+            # type conversions in assignments?
+                # not sure if this is necessary/desired functionality
+            # figure out how to declare globals
+            # getChar not working
+                # characters suck. everything is a string.
 
-        # todo
-        # in if stmt, make it necessary for there to be at least 1 stmt?
+        # todo:
 
-        # type conversions in assignments
 
-        # figure out how to declare globals
+        # and main enemy: err handling
 
-        # fix for loop apparently
 
-        # getChar not working
+
 
         # clean up  anything with arrays... so gross
             # need some global "is this array" function or thing
@@ -318,8 +331,6 @@ class IRGenerator(object):
             # as that screws everything up
             # arithop, assignment huge if stmts
 
-        # and main enemy: err handling
-        # is this really still an issue?
 
         tokType = pattern.tokType
 
@@ -672,10 +683,12 @@ class IRGenerator(object):
                 del self.condStack[-1]
 
         elif tokType == "loop_open":
-            # ("for", "lparen","assignment_stmt", "semic"): "loop_open",
-            # ("loop_open", "expression", "rparen"): "loop_start",
-            # ("loop_start", "statement", "semic",): "loop_start",
-            # ("loop_start", "end", "for",): "loop_stmt",
+            '''
+            ("for", "lparen","name", "assignment", "expression", "semic"): "loop_open",
+            ("loop_open", "expression", "rparen"): "loop_start",
+            ("loop_start", "statement", "semic",): "loop_start",
+            ("loop_start", "end", "for",): "loop_stmt",
+            '''
             bb = self.builder.basic_block
             bbbranch = self.builder.append_basic_block(name=bb.name + '.loopstart')
 
@@ -689,13 +702,6 @@ class IRGenerator(object):
             if firstChild.tokType == "loop_open":
                 cond = pattern.children[1].irHandle
 
-                '''
-                name = pattern.children[1].grabLeafValue(0)
-                ptr = self.symTable[name].irPtr
-                val = self.builder.load(ptr)
-                result = self.builder.add(val, ir.Constant(ir.IntType(32), "-1")) # just add 1 to variable
-                self.builder.store(result, ptr)
-                '''
 
                 bb = self.builder.basic_block
                 bbloop = self.builder.append_basic_block(name=bb.name + '.loopblock')
@@ -711,20 +717,69 @@ class IRGenerator(object):
                 pattern.irHandle = bbbranch
                 self.enterLoop()
 
+                '''
                 name = pattern.children[1].grabLeafValue(0)
                 ptr = self.symTable[name].irPtr
-
                 val = self.builder.load(ptr)
-                result = self.builder.add(val, ir.Constant(ir.IntType(32), "1")) # just add 1 to variable
-
+                result = self.builder.add(val, ir.Constant(ir.IntType(32), "1"))
                 self.builder.store(result, ptr)
+                '''
+
 
             else:
                 pattern.irHandle = pattern.children[0].irHandle
 
         elif tokType == "loop_stmt":
+            #("name", "assignment", "expression"): "assignment_stmt",
+            '''
+                This is honestly some black magic, it's really gross
+                We need to re-parse the expression in the assignment
+                So that the IR can be readded
+                (I wish I could just move the LLVM instructions but oh well)
+                (Future library contribution?)
+
+                Also, this needs to be done here as it is the END of the for loop
+                if something uses i, it needs to be 0, not 1
+
+                These are the steps:
+                1) Descend to loop_open to get the assignment pattern
+                2) clear all IR handles for the expression
+                3) reparse the expression in new location
+                4) create custom assignment pattern and parse it
+
+                The clearing of IR handles works because each of expr, factor, etc
+                Will assign to the 0th child handle if there is not one
+                So we clear them one by one and build a list of patterns to reparse
+                Note: this probably doesn't always work (shh)
+            '''
+
+
+            # descend to the first loop start to grab the name
+            tmpPattern = pattern
+            while tmpPattern.tokType != "loop_open":
+                tmpPattern = tmpPattern.children[0]
+
+            #("for", "lparen","name", "assignment", "expression", "semic"): "loop_open",
+
+            namePattern = tmpPattern.children[2]
+            exprPattern = tmpPattern.children[4]
+
+            toReParse = []
+            tmpPattern = exprPattern
+            while tmpPattern.irHandle:
+                toReParse.append(tmpPattern)
+                tmpPattern.irHandle = None
+                tmpPattern = tmpPattern.children[0]
+
+            for tmpPattern in reversed(toReParse):
+                self.addIR(tmpPattern)
+
+            assignPattern = Pattern("assignment_stmt", [namePattern, "assignment", exprPattern])
+            self.addIR(assignPattern)
+
             # still in loop, loop back to start of loop
             # pattern handle should be bbbranch
+
             loopHandle = pattern.children[0].irHandle
             self.builder.branch(loopHandle)  # loop back to the bbbranch to decide to keep going
 
@@ -895,12 +950,12 @@ class IRGenerator(object):
                     typ = self.getType(child.resultType)
 
                 if numChildren == 2:
-                    # TODO michael fix globals
-                    ptr = self.builder.alloca(typ, name=child.name)
+                    # is this really it? damn. that was easy
+                    # thanks LLVM testing code
+                    # saved me about 5 hours there
                     pattern.irHandle = ir.GlobalVariable(self.module, typ, child.name)
+                    pattern.irHandle.linkage = "internal"
 
-                    # already promoted in typecheck
-                    #
                 else:
                     #declaring a variable
                     # alignSize = child.arraySize if child.arraySize else None
@@ -914,7 +969,7 @@ class IRGenerator(object):
 
         elif tokType == "assignment_stmt":
             # ("name", "assignment", "expression"): "assignment_stmt",
-            typ = self.getType(pattern.children[2].resultType)
+            #typ = self.getType(pattern.children[2].resultType)
             result = pattern.children[2].irHandle
 
             name = pattern.grabLeafValue(0)
@@ -978,69 +1033,3 @@ class IRGenerator(object):
         # for(i := 0; i < zach)
             # ryan := zach + i;
         # end for;
-
-        self.patterns = {
-            #done
-            ("for", "lparen","assignment_stmt", "semic"): "loop_open",
-            ("loop_open", "expression", "rparen"): "loop_start",
-            ("loop_start", "statement", "semic",): "loop_start",
-            ("loop_start", "end", "for",): "loop_stmt",
-            ("return",): "return_stmt",
-            ("if", "lparen", "expression", "rparen", "then", ): "if_start",
-            ("if_start", "statement","semic",): "if_start",
-            ("if_start", "else", ): "else_start", # get rid of this to catch stmts
-            ("else_start", "statement", "semic",): "else_start",
-            ("if_start", "end", "if",): "if_stmt",
-            ("else_start", "end", "if"): "if_stmt",
-            ("assignment_stmt",): "statement",
-            ("if_stmt",): "statement",
-            ("loop_stmt",): "statement",
-            ("return_stmt",): "statement",
-            ("procedure_call",): "statement",
-            ("type_mark", "identifier"): "variable_declaration",
-            ("type_mark", "identifier","lbracket", "number", "colon", "number", "rbracket"): "variable_declaration",
-            ("type_mark", "identifier","lbracket", "expression", "rbracket"): "variable_declaration",
-            ("begin",): "procedure_body_start",
-            ("procedure_body_start", "statement", "semic",): "procedure_body_start",
-            ("procedure_body_start", "end", "procedure",): "procedure_body",
-
-
-            ("variable_declaration", "in",): "parameter",
-            ("variable_declaration", "out",): "parameter",
-            ("variable_declaration", "inout",): "parameter",
-
-
-
-            ("parameter",): "parameter_list",
-            ("parameter_list", "comma", "parameter"): "parameter_list",
-
-            ("procedure", "identifier", "lparen", "rparen",): "procedure_header",
-            ("procedure", "identifier", "lparen", "parameter_list","rparen"): "procedure_header",
-            # takes care of  declarations before procedure
-            # and name differently to allow increasing sym table only once
-            ("procedure_header", "declaration", "semic",): "procedure_header_w_vars",
-            ("procedure_header_w_vars", "declaration", "semic",): "procedure_header_w_vars",
-
-            ("procedure_header", "procedure_body",): "procedure_declaration",
-            ("procedure_header_w_vars", "procedure_body",): "procedure_declaration",
-
-            ("global", "procedure_declaration",): "declaration",
-            ("global", "variable_declaration",): "declaration",
-            ("procedure_declaration",): "declaration",
-            ("variable_declaration",): "declaration",
-
-            # all programs are procedures until the end?
-            ("procedure_body_start", "end", "program",): "program_body",
-
-            # this doesn't work - when do we shift vs. reduce? (might reduce identifier)
-            # ( i guess I could shift)
-            # (whatever fuck it)
-            # ("program", "identifier", "is",): "program_header",
-            # this way, identifier isn't caught between shift and reduce
-            ("program", "identifier",): "program_header_start",
-            ("program_header_start", "is"): "program_header",
-
-            ("program_header", "declaration", "semic",): "program_header",
-
-            ("program_header", "program_body", "period"): "program",
-        }
