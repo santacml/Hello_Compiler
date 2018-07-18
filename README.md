@@ -9,7 +9,7 @@ gcc -c -Wall -Werror -fpic runtime.c
 gcc -shared -o runtimelib.so runtime.o
 ```
 
-Next, Python will need to be installed as well as the library LLVMLite. Install Python, then using Pip (or Conda):
+Next, Python 3 (Python 2 will not work) will need to be installed as well as the library LLVMLite. Install Python 3, then using Pip (or Conda):
 
 ```
 pip install llvmlite
