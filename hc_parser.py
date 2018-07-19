@@ -228,6 +228,9 @@ class PatternMatcher(object):
             ("name", "assignment",): "__shift__", # for destination/assignment
             ("identifier", "lbracket",): "__shift__", # to make sure names suck up vars[5]
 
+            ("number", "colon",): "__shift__",
+            ("number", "colon", "number", "rbracket"): "__shift__",
+
             # prevent terms getting sucked up
             ("term", "multiply",): "__shift__",
             ("term", "divide", ): "__shift__",
@@ -285,7 +288,7 @@ class PatternMatcher(object):
         matched = self.patterns.get(pattern, False)
         # if lookAheadTok and lookAheadTok[0] in self.lookAheadTable and self.lookAheadTable[lookAheadTok[0]] == pattern:
             # matched = False
-            # print("performed lookahead", pattern, lookAheadTok)
+            # print("performed lookahead", pattern, lookAheadTok)]
         if lookAheadTok:
             lookAheadPattern = pattern + (lookAheadTok[0],)
             # print("looking ahead for", lookAheadPattern)
@@ -398,7 +401,7 @@ class Parser(object):
                 # self.irGenerator.addIR(newToken)
 
 
-                # print("reducing", pattern, "to", newToken.tokType)  # very important for debug
+                #print("reducing", pattern, "to", newToken.tokType)  # very important for debug
 
                 self.currTokens = self.currTokens[:n]
                 self.currTokens.append(newToken)

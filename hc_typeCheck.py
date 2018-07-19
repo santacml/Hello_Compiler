@@ -295,12 +295,15 @@ class TypeChecker(object):
             arraySize=0
             arrayStart=0
             if numChildren == 7: # don't need to check if 2 children
-                start = pattern.children[3].children[0].resultType
-                end = pattern.children[5].children[0].resultType
+                start = pattern.grabLeafValue(3)
+                end = pattern.grabLeafValue(5)
                 start = int(start)
                 end = int(end)
                 arraySize = end - start
                 arrayStart = start
+
+                if arraySize == 0:
+                    raise TypeCheckError(lineErrStart + "Arrays cannot be of length 0.")
 
             elif numChildren == 5:
                 if not pattern.children[3].resultType == "integer":

@@ -174,13 +174,13 @@ class Relation(StateMachine):
 
 class Assignment(StateMachine):
     def __init__(self):
-        StateMachine.__init__(self, "assignment")
+        StateMachine.__init__(self, "colon")
         self.states = {
             "=": End("assignment")
         }
 
-    def terminate(self):
-        raise ScanError("Assignment must be exactly ':='")
+    #def terminate(self):
+    #    raise ScanError("Assignment must be exactly ':='")
 
 class DivideOrComment(StateMachine):
     def __init__(self):
