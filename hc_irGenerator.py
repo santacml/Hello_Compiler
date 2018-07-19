@@ -397,7 +397,7 @@ class IRGenerator(object):
                     pattern.irHandle = self.builder.neg(child.irHandle)
 
             else:
-                print("Is this tested?")
+                #print("Is this tested?")
                 pattern.irHandle = pattern.children[1].irHandle
                 # should be handled in expression
 
@@ -552,7 +552,6 @@ class IRGenerator(object):
                     ptr = symItem.irPtr
 
                     for x in range(0, symItem.arraySize):
-                        print(x)
                         loc = ir.Constant(ir.IntType(32), str(x))
                         zero = ir.Constant(ir.IntType(32), 0)
                         ptrInArray = self.builder.gep(ptr, [zero, loc])
