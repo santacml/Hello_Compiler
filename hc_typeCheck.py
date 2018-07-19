@@ -155,6 +155,12 @@ class TypeChecker(object):
             pattern.resultType = symItem.valType
 
             if len(pattern.children) == 4:
+                loc = int(pattern.grabLeafValue(2))
+                upper = symItem.arraySize + symItem.arrayStart - 1
+                lower = symItem.arrayStart
+                if loc > upper or loc < lower:
+                    raise TypeCheckError(lineErrStart + "Array index out of bounds.")
+
                 pattern.arrayExprIRHandle = pattern.children[2].irHandle
 
         elif tokType == "factor":
