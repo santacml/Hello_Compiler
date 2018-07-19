@@ -3,6 +3,7 @@ program test_program is
     integer c[0:1];
 begin
     b[3] := 4;
+    b := b + 5;
     putInteger(b[3]);
     c[0] := 5;
     putInteger(c[0]);

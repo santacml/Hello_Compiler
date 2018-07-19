@@ -417,12 +417,13 @@ class IRGenerator(object):
             name = pattern.grabLeafValue(0)
 
             if name in self.symTable:
+                symItem = self.symTable[name]
 
                 if pattern.arrayExprIRHandle:
                     loc =  pattern.arrayExprIRHandle
-                    loc = self.builder.add(loc, ir.Constant(ir.IntType(32), str(- pattern.arrayStart)))
+                    loc = self.builder.sub(loc, ir.Constant(ir.IntType(32), str(symItem.arrayStart)))
 
-                    ptr = self.symTable[name].irPtr
+                    ptr = symItem.irPtr
 
                     zero = ir.Constant(ir.IntType(32), 0)
                     ptrInArray = self.builder.gep(ptr, [zero, loc])
@@ -430,7 +431,7 @@ class IRGenerator(object):
                     val = self.builder.load(ptrInArray)
 
                 else:
-                    val = self.builder.load(self.symTable[name].irPtr)
+                    val = self.builder.load(symItem.irPtr)
 
                 # print(name, val)
                 pattern.irHandle = val
@@ -524,9 +525,9 @@ class IRGenerator(object):
                     for x in range(0, lhsItem.arraySize):
                         zero = ir.Constant(ir.IntType(32), 0)
 
-                        lhsLoc = ir.Constant(ir.IntType(32), str(x-lhsItem.arrayStart))
+                        lhsLoc = ir.Constant(ir.IntType(32), str(x))
                         lhsPtrInArray = self.builder.gep(lhsPtr, [zero, lhsLoc])
-                        rhsLoc = ir.Constant(ir.IntType(32), str(x-rhsItem.arrayStart))
+                        rhsLoc = ir.Constant(ir.IntType(32), str(x))
                         rhsPtrInArray = self.builder.gep(rhsPtr, [zero, rhsLoc])
 
                         lhsVal = self.builder.load(lhsPtrInArray)
@@ -551,7 +552,8 @@ class IRGenerator(object):
                     ptr = symItem.irPtr
 
                     for x in range(0, symItem.arraySize):
-                        loc = ir.Constant(ir.IntType(32), str(x-symItem.arrayStart))
+                        print(x)
+                        loc = ir.Constant(ir.IntType(32), str(x))
                         zero = ir.Constant(ir.IntType(32), 0)
                         ptrInArray = self.builder.gep(ptr, [zero, loc])
 
@@ -990,7 +992,7 @@ class IRGenerator(object):
                             raise TypeCheckError("Tried to assign array to array of different size")
 
                         for x in range(0, symItem.arraySize):
-                            loc = ir.Constant(ir.IntType(32), str(x-symItem.arrayStart))
+                            loc = ir.Constant(ir.IntType(32), str(x))
                             zero = ir.Constant(ir.IntType(32), 0)
                             ptrInArray = self.builder.gep(ptr, [zero, loc])
 
@@ -1002,7 +1004,7 @@ class IRGenerator(object):
                         pass
                 else:
                     loc =  tmpPattern.arrayExprIRHandle
-                    loc = self.builder.add(loc, ir.Constant(ir.IntType(32), str(- pattern.arrayStart)))
+                    loc = self.builder.sub(loc, ir.Constant(ir.IntType(32), str(symItem.arrayStart)))
 
 
                     #newArr = self.builder.insert_value(self.builder.load(ptr), result, 2)
